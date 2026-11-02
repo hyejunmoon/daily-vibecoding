@@ -1,0 +1,610 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><style>body{margin:0;font:14px system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style></head><body><title>White Ferrari</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cherry+Bomb+One&family=Gowun+Dodum&display=swap">
+<style>
+  /* One sheet of paper: a drawing on a ruled line, the controls written underneath in the same ink. */
+  :root {
+    --paper: #ffffff;
+    --ink: #000000;
+    --pencil: #8a8a86;
+    --wash: #f3f3f1;
+    --display: "Cherry Bomb One", "Arial Rounded MT Bold", "Varela Round", system-ui, sans-serif;
+    --body: "Gowun Dodum", "Apple SD Gothic Neo", system-ui, sans-serif;
+    color-scheme: light;
+  }
+  html, body { background: var(--paper); color: var(--ink); }
+  body {
+    font-family: var(--body);
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding-block: 28px 40px;
+  }
+  .sheet { max-width: 980px; margin: 0 auto; display: grid; gap: 22px; }
+  header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  h1 { font-family: var(--display); font-weight: 400; font-size: 28px; margin: 0; letter-spacing: -0.01em; }
+
+  .stage { position: relative; width: 100%; aspect-ratio: 2 / 1; max-width: 100%; }
+  .stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  .busy {
+    position: absolute; right: 0; top: 0; font-size: 12px; color: var(--pencil);
+    display: flex; align-items: center; gap: 6px;
+  }
+  .busy[hidden] { display: none; }
+  .busy i { width: 8px; height: 8px; border: 1.5px solid var(--ink); border-radius: 50%; animation: bob 0.9s ease-in-out infinite alternate; }
+  @keyframes bob { to { transform: translateY(-5px); } }
+
+  .controls { display: grid; gap: 18px; }
+  .row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  .word {
+    flex: 1 1 220px; min-width: 0; display: flex; align-items: center; gap: 10px;
+    border-bottom: 1.5px solid var(--ink); padding-bottom: 4px;
+  }
+  .word input {
+    flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--ink);
+    font-family: var(--display); font-weight: 400; font-size: 26px; padding: 2px 0;
+  }
+  .btn {
+    font-family: var(--display); font-weight: 400; font-size: 15px; color: var(--ink);
+    background: var(--paper); border: 1.5px solid var(--ink); border-radius: 999px;
+    padding: 7px 16px; cursor: pointer; white-space: nowrap;
+  }
+  .btn:hover { background: var(--wash); }
+  .btn:focus-visible, .chip:focus-visible, input:focus-visible { outline: 2px dashed var(--ink); outline-offset: 3px; }
+  .btn[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+
+  .slide { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 14px; }
+  .slide span { font-family: var(--display); font-weight: 400; font-size: 18px; }
+  input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 32px; background: transparent; cursor: pointer; }
+  input[type=range]::-webkit-slider-runnable-track { height: 1.5px; background: var(--ink); }
+  input[type=range]::-moz-range-track { height: 1.5px; background: var(--ink); }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 26px; height: 26px; margin-top: -12.25px;
+    background: var(--paper); border: 1.5px solid var(--ink); border-radius: 50%;
+  }
+  input[type=range]::-moz-range-thumb { width: 24px; height: 24px; background: var(--paper); border: 1.5px solid var(--ink); border-radius: 50%; }
+
+  .note { min-height: 20px; margin: 0; font-size: 13px; color: var(--pencil); }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip {
+    font-family: var(--display); font-weight: 400; font-size: 14px; color: var(--ink);
+    background: var(--paper); border: 1.5px solid var(--ink); border-radius: 999px; padding: 4px 12px; cursor: pointer;
+  }
+  .chip:hover { background: var(--wash); }
+  @media (prefers-reduced-motion: reduce) { .busy i { animation: none; } }
+</style>
+
+<div class="sheet">
+
+  <div class="stage" id="stage" role="img" aria-label="글자와 그림 사이를 오가는 선 그림">
+    <canvas id="cv"></canvas>
+    <div class="busy" id="busy" hidden><i></i><span>그리는 중</span></div>
+  </div>
+
+  <div class="controls">
+    <div class="row">
+      <label class="word" for="word">
+        <input id="word" type="text" maxlength="14" autocomplete="off" spellcheck="false" placeholder="apple" aria-label="영어 단어">
+      </label>
+    </div>
+    <div class="slide">
+      <span>Text</span>
+      <input id="mix" type="range" min="0" max="1000" value="500" aria-label="글자에서 그림으로 바뀌는 정도">
+      <span>Image</span>
+    </div>
+    <p class="note" id="note"></p>
+    <div class="chips" id="chips" aria-label="바로 써 볼 단어"></div>
+  </div>
+</div>
+
+<script>
+(() => {
+'use strict';
+const $ = (id) => document.getElementById(id);
+const cv = $('cv'), ctx = cv.getContext('2d');
+const word = $('word'), mix = $('mix'), note = $('note'), busy = $('busy');
+
+/* ---------- picture book: shapes drawn in a 1000 x 600 box ----------
+   fill  = shapes that make the body (united)
+   holes = shapes cut out of the body (eyes, windows)
+   lines = open pen strokes that appear near the image end (mouth, seams) */
+const circle = (x, y, r) => `M${x - r} ${y} A${r} ${r} 0 1 0 ${x + r} ${y} A${r} ${r} 0 1 0 ${x - r} ${y} Z`;
+const ellipse = (x, y, rx, ry) => `M${x - rx} ${y} A${rx} ${ry} 0 1 0 ${x + rx} ${y} A${rx} ${ry} 0 1 0 ${x - rx} ${y} Z`;
+const star = (cx, cy, R, r) => {
+  let d = '';
+  for (let i = 0; i < 10; i++) {
+    const a = -Math.PI / 2 + i * Math.PI / 5, k = i % 2 ? r : R;
+    d += (i ? 'L' : 'M') + (cx + Math.cos(a) * k).toFixed(1) + ' ' + (cy + Math.sin(a) * k).toFixed(1) + ' ';
+  }
+  return d + 'Z';
+};
+
+const BOOK = {
+  dog: {
+    fill: [
+      'M150 170 C150 115 195 92 240 102 C275 82 330 82 360 102 C405 92 445 115 445 170 L445 205 C530 215 640 210 715 200 C745 130 785 62 828 62 C868 62 862 132 842 205 C830 250 822 290 822 335 C822 400 805 445 795 500 C788 535 742 538 737 505 L727 432 C705 440 683 442 662 440 L652 502 C646 535 602 535 600 502 L596 422 C540 404 482 404 432 412 L422 502 C416 535 372 535 369 502 L362 422 L332 422 L322 502 C316 535 272 535 269 502 L266 418 C200 398 155 352 152 302 C118 292 112 250 128 222 C140 200 150 188 150 170 Z'
+    ],
+    holes: [circle(232, 175, 13), circle(332, 175, 13), ellipse(705, 300, 14, 20)],
+    lines: ['M252 252 C268 276 300 276 316 252', 'M284 248 L284 262']
+  },
+  car: {
+    fill: [
+      'M60 420 C60 372 102 348 172 338 L330 322 C392 272 470 236 560 233 C642 230 702 252 762 302 L882 322 C932 332 958 362 958 402 L958 440 C958 460 942 470 922 470 L82 470 C66 470 60 456 60 440 Z',
+      circle(250, 468, 72), circle(790, 468, 72)
+    ],
+    holes: [
+      'M382 320 C432 282 492 264 556 264 C602 264 642 277 682 307 L672 320 Z',
+      circle(250, 468, 30), circle(790, 468, 30), ellipse(915, 372, 18, 11)
+    ],
+    lines: ['M560 330 L560 425', 'M360 424 L700 424']
+  },
+  apple: {
+    fill: [
+      'M500 195 C430 140 300 140 250 232 C200 332 230 472 320 540 C370 580 430 570 500 545 C570 570 630 580 680 540 C770 472 800 332 750 232 C700 140 570 140 500 195 Z',
+      'M488 200 C492 152 498 112 518 72 L546 82 C526 122 518 162 516 205 Z',
+      'M528 132 C562 72 640 62 690 82 C660 142 592 162 528 132 Z'
+    ],
+    holes: [],
+    lines: ['M300 300 C292 352 304 402 330 442']
+  },
+  cat: {
+    fill: [
+      'M330 560 C280 560 262 520 270 470 C280 402 300 352 330 322 C300 300 282 252 290 202 L282 100 L352 150 C382 140 420 140 450 150 L520 100 L512 202 C520 252 502 300 472 322 C542 362 600 430 600 500 C640 500 700 470 720 420 C735 390 772 400 762 432 C742 500 682 560 600 560 Z'
+    ],
+    holes: [circle(362, 222, 12), circle(442, 222, 12)],
+    lines: ['M386 262 C396 276 408 276 402 262 C396 276 386 276 380 262', 'M300 260 L240 250', 'M300 272 L242 284', 'M500 260 L560 250', 'M500 272 L558 284']
+  },
+  fish: {
+    fill: ['M160 300 C250 168 470 138 640 220 L830 118 C806 200 806 400 830 482 L640 380 C470 462 250 432 160 300 Z'],
+    holes: [circle(292, 272, 17)],
+    lines: ['M402 206 C434 262 434 340 402 394', 'M200 318 C222 322 240 318 252 308']
+  },
+  heart: {
+    fill: ['M500 560 C380 470 180 360 180 222 C180 132 250 82 330 82 C410 82 470 132 500 192 C530 132 590 82 670 82 C750 82 820 132 820 222 C820 360 620 470 500 560 Z'],
+    holes: [],
+    lines: ['M260 200 C262 172 280 152 306 146']
+  },
+  star: { fill: [star(500, 320, 270, 115)], holes: [], lines: [] },
+  house: {
+    fill: ['M170 300 L500 72 L830 300 L742 300 L742 545 L258 545 L258 300 Z', 'M632 150 L700 150 L700 262 L632 214 Z'],
+    holes: ['M322 340 L448 340 L448 446 L322 446 Z', 'M560 378 L672 378 L672 545 L560 545 Z'],
+    lines: ['M385 340 L385 446', 'M322 393 L448 393']
+  },
+  tree: {
+    fill: ['M462 560 L476 402 C380 422 262 382 252 302 C200 282 212 200 272 190 C272 120 352 80 412 110 C452 50 562 50 592 110 C662 80 742 130 732 200 C792 220 792 302 732 322 C702 402 602 422 524 402 L538 560 Z'],
+    holes: [],
+    lines: ['M500 470 C506 444 520 430 540 424']
+  },
+  duck: {
+    fill: ['M300 230 C300 150 360 108 420 108 C490 108 540 158 540 228 C540 262 528 290 510 312 C600 300 700 280 790 240 C800 300 780 380 730 430 C670 490 580 520 480 520 C360 520 250 470 250 390 C250 340 280 312 320 300 C306 282 300 258 300 230 Z', 'M300 210 L190 236 L300 262 Z'],
+    holes: [circle(400, 190, 14)],
+    lines: ['M470 380 C540 420 630 420 690 370']
+  },
+  cloud: {
+    fill: ['M210 470 C140 470 110 420 120 372 C130 322 180 300 222 310 C222 230 292 182 362 202 C392 130 492 102 562 152 C612 112 712 132 732 212 C812 202 872 262 862 332 C902 352 902 470 822 470 Z'],
+    holes: [], lines: []
+  }
+};
+const ALIAS = {
+  hund: 'dog', dog: 'dog', puppy: 'dog', doggy: 'dog',
+  ferrari: 'car', car: 'car', porsche: 'car', lamborghini: 'car', racecar: 'car',
+  apple: 'apple', cat: 'cat', kitty: 'cat', katze: 'cat',
+  fish: 'fish', heart: 'heart', love: 'heart', star: 'star',
+  house: 'house', home: 'house', haus: 'house', tree: 'tree', baum: 'tree',
+  duck: 'duck', cloud: 'cloud'
+};
+const CHIPS = ['ferrari', 'apple', 'cat', 'fish', 'duck', 'house', 'tree', 'heart', 'star'];
+
+/* ---------- storage, guarded ---------- */
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
+};
+const drawn = store.get('wordblob-drawn', {});   // words Claude drew before
+// drawings saved before the no-face rule have no kind; drop them so they get drawn again
+for (const k of Object.keys(drawn)) if (!drawn[k] || !drawn[k].kind) delete drawn[k];
+store.set('wordblob-drawn', drawn);
+
+/* ---------- distance fields ---------- */
+let W = 0, H = 0, DPR = 1;        // css size of the stage, field grid is css px
+let textBox = { w: 1, h: 1 };
+let fText = null, fImg = null, fLine = null, noise = null, wob = null;
+const INF = 1e20;
+
+function edt1d(f, n, d, v, z) {
+  let k = 0; v[0] = 0; z[0] = -INF; z[1] = INF;
+  for (let q = 1; q < n; q++) {
+    let r = v[k], s = ((f[q] + q * q) - (f[r] + r * r)) / (2 * q - 2 * r);
+    while (s <= z[k]) { k--; r = v[k]; s = ((f[q] + q * q) - (f[r] + r * r)) / (2 * q - 2 * r); }
+    k++; v[k] = q; z[k] = s; z[k + 1] = INF;
+  }
+  k = 0;
+  for (let q = 0; q < n; q++) { while (z[k + 1] < q) k++; const r = v[k]; d[q] = (q - r) * (q - r) + f[r]; }
+}
+// squared distance from every cell to the nearest cell where seed[i] is true
+function edt(seed, w, h) {
+  const g = new Float64Array(w * h), n = Math.max(w, h);
+  const f = new Float64Array(n), d = new Float64Array(n), v = new Int32Array(n), z = new Float64Array(n + 1);
+  for (let i = 0; i < w * h; i++) g[i] = seed[i] ? 0 : INF;
+  for (let x = 0; x < w; x++) {
+    for (let y = 0; y < h; y++) f[y] = g[y * w + x];
+    edt1d(f, h, d, v, z);
+    for (let y = 0; y < h; y++) g[y * w + x] = d[y];
+  }
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) f[x] = g[y * w + x];
+    edt1d(f, w, d, v, z);
+    for (let x = 0; x < w; x++) g[y * w + x] = d[x];
+  }
+  return g;
+}
+// negative inside, positive outside, in css px
+function signedField(inside, w, h) {
+  const out = new Uint8Array(w * h);
+  for (let i = 0; i < w * h; i++) out[i] = inside[i] ? 0 : 1;
+  const toIn = edt(inside, w, h), toOut = edt(out, w, h);
+  const s = new Float32Array(w * h);
+  for (let i = 0; i < w * h; i++) s[i] = inside[i] ? -(Math.sqrt(toOut[i]) - 0.5) : Math.sqrt(toIn[i]) - 0.5;
+  return s;
+}
+function maskOf(paint) {
+  const c = document.createElement('canvas'); c.width = W; c.height = H;
+  const g = c.getContext('2d');
+  paint(g);
+  const a = g.getImageData(0, 0, W, H).data, m = new Uint8Array(W * H);
+  for (let i = 0; i < W * H; i++) m[i] = a[i * 4 + 3] > 127 ? 1 : 0;
+  return m;
+}
+
+const BASE = () => H * 0.86;     // the ruled line the drawing stands on
+
+function buildText(text) {
+  const t = text.trim() || ' ';
+  const font = (px) => `400 ${px}px ${getComputedStyle(document.documentElement).getPropertyValue('--display')}`;
+  const probe = document.createElement('canvas').getContext('2d');
+  probe.font = font(100);
+  probe.letterSpacing = '4px';
+  const m = probe.measureText(t);
+  const bw = (m.actualBoundingBoxLeft + m.actualBoundingBoxRight) || 1;
+  const bh = (m.actualBoundingBoxAscent + m.actualBoundingBoxDescent) || 1;
+  const R0 = 0.03;                                   // puff, as a share of font size
+  const s = Math.min((W * 0.84) / (bw + 200 * R0), (H * 0.6) / (bh + 200 * R0));
+  const px = 100 * s, R = px * R0;
+  const x = W / 2 - (bw * s) / 2 + m.actualBoundingBoxLeft * s;
+  const y = BASE() - R - m.actualBoundingBoxDescent * s;
+  const inside = maskOf((g) => { g.font = font(px); g.letterSpacing = (4 * s).toFixed(1) + 'px'; g.fillStyle = '#000'; g.textBaseline = 'alphabetic'; g.fillText(t, x, y); });
+  const f = signedField(inside, W, H);
+  for (let i = 0; i < f.length; i++) f[i] -= R;      // puff every letter out so it goes round
+  textBox = { w: bw * s + 2 * R, h: bh * s + 2 * R };
+  return f;
+}
+
+function bboxOf(spec) {
+  const c = document.createElement('canvas'); c.width = 1000; c.height = 600;
+  const g = c.getContext('2d'); g.fillStyle = '#000';
+  spec.fill.forEach((d) => g.fill(new Path2D(d)));
+  const a = g.getImageData(0, 0, 1000, 600).data;
+  let x0 = 1000, y0 = 600, x1 = 0, y1 = 0;
+  for (let y = 0; y < 600; y++) for (let x = 0; x < 1000; x++) if (a[(y * 1000 + x) * 4 + 3] > 127) {
+    if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
+  }
+  return x1 < x0 ? null : { x: x0, y: y0, w: x1 - x0 + 1, h: y1 - y0 + 1 };
+}
+
+function buildImage(spec) {
+  const b = bboxOf(spec);
+  if (!b) return null;
+  const s = Math.min((W * 0.8) / b.w, (H * 0.7) / b.h);
+  const tx = W / 2 - (b.x + b.w / 2) * s, ty = BASE() - (b.y + b.h) * s;
+  const place = (g) => g.setTransform(s, 0, 0, s, tx, ty);
+  const inside = maskOf((g) => {
+    place(g); g.fillStyle = '#000';
+    spec.fill.forEach((d) => g.fill(new Path2D(d)));
+    g.globalCompositeOperation = 'destination-out';
+    spec.holes.forEach((d) => g.fill(new Path2D(d)));
+  });
+  const pen = maskOf((g) => {
+    place(g); g.strokeStyle = '#000'; g.lineWidth = 1.6 / s; g.lineCap = 'round'; g.lineJoin = 'round';
+    spec.lines.forEach((d) => g.stroke(new Path2D(d)));
+  });
+  let any = false; for (let i = 0; i < pen.length; i++) if (pen[i]) { any = true; break; }
+  const line = new Float32Array(W * H);
+  if (any) { const g = edt(pen, W, H); for (let i = 0; i < line.length; i++) line[i] = Math.sqrt(g[i]); }
+  else line.fill(1e4);
+  return { fill: signedField(inside, W, H), line, box: { w: b.w * s, h: b.h * s } };
+}
+
+// slow wobble so the outline reads as drawn by hand
+function buildNoise() {
+  const cell = 34, gw = Math.ceil(W / cell) + 2, gh = Math.ceil(H / cell) + 2;
+  const r1 = new Float32Array(gw * gh), r2 = new Float32Array(gw * gh);
+  let seed = 7;
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647) * 2 - 1;
+  for (let i = 0; i < r1.length; i++) { r1[i] = rnd(); r2[i] = rnd(); }
+  const n = new Float32Array(W * H), w = new Float32Array(W * H);
+  const sm = (t) => t * t * (3 - 2 * t);
+  for (let y = 0; y < H; y++) {
+    const gy = y / cell, iy = gy | 0, fy = sm(gy - iy);
+    for (let x = 0; x < W; x++) {
+      const gx = x / cell, ix = gx | 0, fx = sm(gx - ix);
+      const a = iy * gw + ix, b = a + gw;
+      const lerp2 = (r) => (r[a] * (1 - fx) + r[a + 1] * fx) * (1 - fy) + (r[b] * (1 - fx) + r[b + 1] * fx) * fy;
+      n[y * W + x] = lerp2(r1) * 0.9;
+      w[y * W + x] = 1 + lerp2(r2) * 0.28;
+    }
+  }
+  noise = n; wob = w;
+}
+
+/* ---------- drawing ---------- */
+let tmp = null, Lw = null;
+// add w * (src scaled by sx, sy around the centre of the base line) into out
+function warp(src, sx, sy, w, out) {
+  if (w === 0) return;
+  const cx = W / 2, by = BASE(), k = Math.min(sx, sy) * w;
+  for (let y = 0; y < H; y++) {
+    let v = by + (y - by) / sy; if (v < 0) v = 0; if (v > H - 1.001) v = H - 1.001;
+    const v0 = v | 0, fv = v - v0, r0 = v0 * W, r1 = r0 + W;
+    for (let x = 0; x < W; x++) {
+      let u = cx + (x - cx) / sx; if (u < 0) u = 0; if (u > W - 1.001) u = W - 1.001;
+      const u0 = u | 0, fu = u - u0;
+      out[y * W + x] += k * ((src[r0 + u0] * (1 - fu) + src[r0 + u0 + 1] * fu) * (1 - fv) + (src[r1 + u0] * (1 - fu) + src[r1 + u0 + 1] * fu) * fv);
+    }
+  }
+}
+function boxBlur(a, w, h, r) {
+  if (!tmp || tmp.length !== a.length) tmp = new Float32Array(a.length);
+  const k = 1 / (2 * r + 1);
+  for (let y = 0; y < h; y++) {
+    const o = y * w; let acc = 0;
+    for (let x = -r; x <= r; x++) acc += a[o + Math.min(w - 1, Math.max(0, x))];
+    for (let x = 0; x < w; x++) {
+      tmp[o + x] = acc * k;
+      acc += a[o + Math.min(w - 1, x + r + 1)] - a[o + Math.max(0, x - r)];
+    }
+  }
+  for (let x = 0; x < w; x++) {
+    let acc = 0;
+    for (let y = -r; y <= r; y++) acc += tmp[Math.min(h - 1, Math.max(0, y)) * w + x];
+    for (let y = 0; y < h; y++) {
+      a[y * w + x] = acc * k;
+      acc += tmp[Math.min(h - 1, y + r + 1) * w + x] - tmp[Math.max(0, y - r) * w + x];
+    }
+  }
+}
+let img = null, F = null, raf = 0;
+function render() {
+  raf = 0;
+  if (!fText) return;
+  const t = mix.value / 1000;
+  const N = W * H;
+  if (!F || F.length !== N) F = new Float32Array(N);
+  if (!fImg) { for (let i = 0; i < N; i++) F[i] = fText[i] + noise[i]; }
+  else {
+    // both shapes are stretched to one shared size around the middle of the line,
+    // so the word gathers into a single lump instead of its ends breaking off
+    const e = t * t * (3 - 2 * t);
+    const kx = textBox.w / fImg.box.w, ky = textBox.h / fImg.box.h;
+    const tx = 1 + (1 / kx - 1) * e, ty = 1 + (1 / ky - 1) * e;
+    const ix = kx + (1 - kx) * e, iy = ky + (1 - ky) * e;
+    F.fill(0);
+    warp(fText, tx, ty, 1 - t, F);
+    warp(fImg.fill, ix, iy, t, F);
+    for (let i = 0; i < N; i++) F[i] += noise[i];
+    if (!Lw || Lw.length !== N) Lw = new Float32Array(N);
+    Lw.fill(0); warp(fImg.line, ix, iy, 1, Lw);
+  }
+  // mid-way the two outlines meet in sharp creases; soften them so the blob stays round
+  const rad = fImg ? Math.round(6 * Math.sin(Math.PI * t)) : 0;
+  if (rad > 0) { boxBlur(F, W, H, rad); boxBlur(F, W, H, rad); }
+  const grow = fImg ? Math.max(0, Math.min(1, (t - 0.72) / 0.25)) : 0;
+  const L = fImg ? Lw : null;
+
+  const pw = cv.width, ph = cv.height;
+  if (!img || img.width !== pw || img.height !== ph) img = ctx.createImageData(pw, ph);
+  const px = img.data;
+  const half = 1.05 * DPR, lhalf = 1.0 * DPR * grow;
+  for (let py = 0; py < ph; py++) {
+    let fy = (py + 0.5) / DPR - 0.5; if (fy < 0) fy = 0; if (fy > H - 1.001) fy = H - 1.001;
+    const y0 = fy | 0, wy = fy - y0, r0 = y0 * W, r1 = r0 + W;
+    for (let qx = 0; qx < pw; qx++) {
+      let fx = (qx + 0.5) / DPR - 0.5; if (fx < 0) fx = 0; if (fx > W - 1.001) fx = W - 1.001;
+      const x0 = fx | 0, wx = fx - x0;
+      const i00 = r0 + x0, i10 = r1 + x0;
+      const f = (F[i00] * (1 - wx) + F[i00 + 1] * wx) * (1 - wy) + (F[i10] * (1 - wx) + F[i10 + 1] * wx) * wy;
+      // divide by the slope so the pen keeps one width where the field has flattened
+      const gx = F[i00 + 1] - F[i00], gy = F[i10] - F[i00];
+      const g = Math.max(0.35, Math.sqrt(gx * gx + gy * gy));
+      let a = half * wob[i00] + 0.5 - Math.abs(f / g) * DPR;
+      if (g < 0.5) a *= (g - 0.2) / 0.3;   // flat spots are where the shapes cancel, not an edge
+      if (L && lhalf > 0) {
+        const l = (L[i00] * (1 - wx) + L[i00 + 1] * wx) * (1 - wy) + (L[i10] * (1 - wx) + L[i10 + 1] * wx) * wy;
+        const b = lhalf * wob[i00] + 0.5 - l * DPR;
+        if (b > a) a = b;
+      }
+      const v = a <= 0 ? 255 : a >= 1 ? 0 : 255 - a * 255;
+      const o = (py * pw + qx) * 4;
+      px[o] = px[o + 1] = px[o + 2] = v; px[o + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  document.body.dataset.t = t.toFixed(2);
+}
+const paint = () => { if (!raf) raf = requestAnimationFrame(render); };
+
+/* ---------- words ---------- */
+let current = '', currentSpec = null;
+const keyOf = (s) => s.toLowerCase().replace(/[^a-z]/g, '');
+const specFor = (s) => { const k = keyOf(s); return BOOK[ALIAS[k]] || drawn[k] || null; };
+
+function say(msg) { note.textContent = msg; }
+
+function setWord(raw, rebuildOnly) {
+  current = raw;
+  fText = buildText(raw);
+  currentSpec = specFor(raw);
+  fImg = currentSpec ? buildImage(currentSpec) : null;
+  if (!rebuildOnly) {
+    if (!keyOf(raw)) say('영어 단어를 써 주세요.');
+    else if (currentSpec) say('');
+    else say(sampler === null
+      ? '그림책에 없는 단어예요. 아래 단어로 바꿔 보세요.'
+      : 'Claude가 이 단어를 그리고 있어요.');
+    store.set('wordblob-word2', raw);
+  }
+  document.body.dataset.word = keyOf(raw);
+  document.body.dataset.image = fImg ? 'yes' : 'no';
+  paint();
+}
+
+/* Claude draws a word the book doesn't have */
+let sampler;             // undefined = not asked yet, null = not available here
+async function getSampler() {
+  if (sampler !== undefined) return sampler;
+  try { sampler = window.claude && window.claude.use ? await window.claude.use('sample') : null; }
+  catch { sampler = null; }
+  return sampler;
+}
+const PROMPT = (w) => `Draw "${w}" as a very simple, cute, chunky line-drawing silhouette, like a children's colouring book, seen from the side or front, whichever is most recognisable.
+Faces: only a person or an animal may have a face (eyes, nose, mouth). Every other thing (food, objects, vehicles, plants, buildings, weather, shapes) must have NO face, NO eyes, NO mouth and NO expression at all; never make it cute by giving it a face.
+Coordinate box: x 0-1000, y 0-600, y grows downward. Use most of the box. The object stands on the bottom.
+Return ONLY a JSON object, no prose, in this exact form:
+{"kind":"person" | "animal" | "thing", "fill":["<svg path d>", ...], "holes":["<svg path d>", ...], "lines":["<svg path d>", ...]}
+- kind: "person" or "animal" only for living people and animals; everything else is "thing".
+- fill: 1 to 4 closed shapes that are united into one solid body. Keep the outline smooth and blobby, with no thin spikes.
+- holes: 0 to 5 small closed shapes that lie fully inside the body and are cut out of it (windows, wheel hubs, buttons; eyes only for a person or an animal).
+- lines: 0 to 4 short open strokes drawn on the body (seam, leaf vein, panel line; a mouth only for a person or an animal).
+Use only the commands M L C Q A Z with absolute coordinates. Each path under 600 characters.`;
+
+function cleanSpec(o) {
+  const ok = (d) => typeof d === 'string' && d.length < 1500 && /^[MLCQAZHVSTmlcqazhvst0-9 ,.\-e]+$/.test(d) && (() => { try { new Path2D(d); return true; } catch { return false; } })();
+  if (!o || !Array.isArray(o.fill)) return null;
+  const spec = { fill: o.fill.filter(ok).slice(0, 6), holes: (o.holes || []).filter(ok).slice(0, 8), lines: (o.lines || []).filter(ok).slice(0, 6) };
+  if (!spec.fill.length) return null;
+  spec.kind = o.kind === 'person' || o.kind === 'animal' ? o.kind : 'thing';
+  if (spec.kind === 'thing') noFace(spec);
+  return spec;
+}
+
+/* a thing never gets a face, even when the drawing comes back with one:
+   small round holes (eyes) and short curved strokes (mouth, nose, brows) are dropped */
+function pathBox(d, stroke) {
+  const c = document.createElement('canvas'); c.width = 1000; c.height = 600;
+  const g = c.getContext('2d'); const p = new Path2D(d);
+  if (stroke) { g.lineWidth = 2; g.stroke(p); } else g.fill(p);
+  const a = g.getImageData(0, 0, 1000, 600).data;
+  let x0 = 1e9, y0 = 1e9, x1 = -1, y1 = -1;
+  for (let y = 0; y < 600; y++) for (let x = 0; x < 1000; x++) if (a[(y * 1000 + x) * 4 + 3] > 60) {
+    if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
+  }
+  return x1 < 0 ? null : { w: x1 - x0 + 1, h: y1 - y0 + 1 };
+}
+function noFace(spec) {
+  const body = bboxOf(spec); if (!body) return;
+  const size = Math.max(body.w, body.h);
+  spec.holes = spec.holes.filter((d) => {
+    const b = pathBox(d); if (!b) return false;
+    const round = b.w / b.h > 0.55 && b.w / b.h < 1.8;
+    return !(round && Math.max(b.w, b.h) < size * 0.14);
+  });
+  spec.lines = spec.lines.filter((d) => {
+    const b = pathBox(d, true); if (!b) return false;
+    const curved = /[CQASTcqast]/.test(d);
+    return !(curved && Math.max(b.w, b.h) < size * 0.22);
+  });
+}
+
+let job = null, denied = false;
+// auto: called when typing stops; redo: the button, which also redraws a word Claude drew before
+async function askClaude(redo) {
+  const k = keyOf(current), word0 = current.trim();
+  if (!k || BOOK[ALIAS[k]] || (drawn[k] && !redo) || (denied && !redo)) return;
+  const s = await getSampler();
+  if (!s) { say('이 화면에서는 새 그림을 그릴 수 없어요. 그림책 단어로 바꿔 보세요.'); return; }
+  if (job) job.abort();
+  const mine = job = new AbortController();
+  busy.hidden = false; say('');
+  try {
+    const r = await s(PROMPT(word0), { modelTier: 'default', signal: mine.signal });
+    const m = (r && r.text || '').match(/\{[\s\S]*\}/);
+    const spec = m ? cleanSpec(JSON.parse(m[0])) : null;
+    if (!spec || !bboxOf(spec)) throw { message: 'bad drawing' };
+    spec.label = word0; drawn[k] = spec; store.set('wordblob-drawn', drawn); addChip(word0);
+    if (keyOf(current) === k) { setWord(current); if (redo && +mix.value < 500) slideTo(1000); }
+  } catch (e) {
+    if (mine.signal.aborted) return;            // a newer word took over
+    const code = e && e.code;
+    if (code === 'not_granted') denied = true;
+    if (keyOf(current) === k) say(code === 'not_granted' ? 'Claude에게 묻기가 허용되지 않아 그림책 단어만 쓸 수 있어요.'
+      : code === 'rate_limited' ? '잠시 뒤에 Enter를 눌러 주세요.'
+      : '그림을 받지 못했어요. Enter를 눌러 다시 해 보세요.');
+  } finally { if (job === mine) { job = null; busy.hidden = true; } }
+}
+
+/* ---------- motion of the slider ---------- */
+let anim = 0;
+function slideTo(target) {
+  cancelAnimationFrame(anim);
+  const from = +mix.value, t0 = performance.now(), dur = 900;
+  const step = (now) => {
+    const k = Math.min(1, (now - t0) / dur), e = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+    mix.value = from + (target - from) * e; render();
+    if (k < 1) anim = requestAnimationFrame(step);
+  };
+  anim = requestAnimationFrame(step);
+}
+/* ---------- wiring ---------- */
+let typing = 0, autoDraw = 0;
+word.addEventListener('input', () => {
+  const clean = word.value.replace(/[^A-Za-z .,!?'\-]/g, '');
+  if (clean !== word.value) { word.value = clean; say('영문만 쓸 수 있어요.'); }
+  clearTimeout(typing);
+  typing = setTimeout(() => setWord(word.value), 160);
+  clearTimeout(autoDraw);
+  autoDraw = setTimeout(() => { if (keyOf(word.value).length >= 2) askClaude(false); }, 900);   // draw once typing pauses
+});
+word.addEventListener('keydown', (e) => { if (e.key === 'Enter') { clearTimeout(typing); clearTimeout(autoDraw); setWord(word.value); askClaude(false); } });
+mix.addEventListener('input', () => { cancelAnimationFrame(anim); paint(); store.set('wordblob-mix', +mix.value); });
+
+const chips = $('chips'), shown = new Set();
+// one button per word; words Claude drew are added after the built-in ones
+function addChip(w) {
+  const k = keyOf(w);
+  if (!k || shown.has(k)) return;
+  shown.add(k);
+  const b = document.createElement('button');
+  b.className = 'chip'; b.type = 'button'; b.textContent = w;
+  b.addEventListener('click', () => { word.value = w; setWord(w); });
+  chips.appendChild(b);
+}
+CHIPS.forEach(addChip);
+Object.keys(drawn).forEach((k) => addChip(drawn[k].label || k));
+
+function fit() {
+  const r = $('stage').getBoundingClientRect();
+  const w = Math.max(200, Math.round(r.width)), h = Math.max(100, Math.round(r.height));
+  DPR = Math.min(2, window.devicePixelRatio || 1);
+  if (w === W && h === H && cv.width === Math.round(w * DPR)) return false;
+  W = w; H = h;
+  cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
+  buildNoise();
+  return true;
+}
+let resizing = 0;
+window.addEventListener('resize', () => { clearTimeout(resizing); resizing = setTimeout(() => { if (fit()) setWord(current, true); }, 150); });
+
+function start() {
+  fit();
+  word.value = store.get('wordblob-word2', 'ferrari');
+  mix.value = store.get('wordblob-mix', 500);
+  setWord(word.value);
+}
+const fontReady = document.fonts && document.fonts.load ? document.fonts.load('400 100px "Cherry Bomb One"').catch(() => {}) : Promise.resolve();
+Promise.race([fontReady, new Promise((r) => setTimeout(r, 1500))]).then(start);
+getSampler().then((s) => { if (s === null && current && !currentSpec && keyOf(current)) setWord(current); });
+
+window.__wb = { setWord, addChip, cleanSpec, get t() { return mix.value / 1000; }, set t(v) { mix.value = v * 1000; render(); }, BOOK };
+})();
+</script>
+</body></html>

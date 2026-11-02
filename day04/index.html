@@ -1,0 +1,398 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><style>body{margin:0;font:14px system-ui,sans-serif}img{max-width:100%}</style></head><body><title>Overlap</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+  /* Layout: the Figma card, centred and as big as the screen allows. The word sits on it; a row of four modes, a box to type a new word, and two sliders wait underneath. */
+  :root {
+    color-scheme: light;
+    --page: #f5f5f5;
+    --card: #ffffff;
+    --card-edge: rgba(0, 0, 0, 0.1);
+    --stroke: #000000;
+    --ink: #111111;
+    --ink-soft: rgba(0, 0, 0, 0.4);
+    /* the seven letters, straight from the design */
+    --o: #be8c6b; --v: #4ea530; --e: #fd5c28; --r: #b3ab01; --l: #426c9e; --a: #fc6ca9; --p: #f93571;
+  }
+  html, body { height: 100%; }
+  body {
+    margin: 0; background: var(--page); color: var(--ink);
+    display: grid; place-items: center; overflow: hidden;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    -webkit-user-select: none; user-select: none;
+    font: 500 13px/1 system-ui, -apple-system, sans-serif;
+  }
+  .stage { display: flex; flex-direction: column; align-items: center; gap: 18px; }
+  #art { width: min(86vw, 74vh); height: auto; display: block; cursor: pointer; touch-action: manipulation; }
+  /* letters and their copies stack opaquely, each outline staying visible */
+  .modes { display: flex; gap: 4px; }
+  .modes button {
+    border: 0; background: none; padding: 8px 10px; border-radius: 6px; cursor: pointer;
+    font: inherit; color: var(--ink-soft); letter-spacing: 0.02em;
+  }
+  .modes button[aria-pressed="true"] { color: var(--ink); }
+  .modes button:focus-visible { outline: 1.5px solid var(--ink); }
+  /* how much and how fast, for whichever mode is on */
+  .knobs { display: flex; gap: 22px; align-items: center; min-height: 28px; color: var(--ink-soft); }
+  .knobs[hidden] { visibility: hidden; display: flex; }
+  .knobs label { display: flex; align-items: center; gap: 8px; }
+  .knobs input { width: 140px; accent-color: var(--ink); }
+  .typed { display: flex; align-items: center; gap: 8px; color: var(--ink-soft); }
+  .typed input {
+    width: 220px; height: 30px; padding: 0 10px; border-radius: 6px; border: 1px solid rgba(0, 0, 0, 0.15);
+    background: var(--card); color: var(--ink); font: 400 15px/1 "Helvetica Neue", Helvetica, Arial, sans-serif;
+  }
+  .typed input:focus { outline: none; border-color: var(--ink); }
+  .row { display: flex; align-items: center; gap: 8px; }
+  .chip {
+    height: 30px; padding: 0 12px; border-radius: 6px; cursor: pointer; white-space: nowrap;
+    font: inherit; color: var(--ink); background: var(--card); border: 1px solid rgba(0, 0, 0, 0.15);
+  }
+  .chip:hover { border-color: var(--ink); }
+  .chip[hidden] { display: none; }
+  .knobs output { min-width: 3.2em; color: var(--ink); font-variant-numeric: tabular-nums; }
+</style>
+
+<div class="stage">
+  <svg id="art" viewBox="40 40 213 207" role="img" aria-label="Overlap. 흰 카드 위의 알록달록한 overlap. 누를 때마다 글자가 여러 색의 복사본과 함께 세로로, 가로로 마구 움직이거나 늘어나며 비틀려요.">
+    <defs>
+      <clipPath id="card-clip"><rect x="40" y="40" width="213" height="207" rx="2"/></clipPath>
+    </defs>
+    <rect x="40" y="40" width="213" height="207" rx="2" style="fill:var(--card)"/>
+    <g id="word" clip-path="url(#card-clip)"></g>
+    <rect x="40.5" y="40.5" width="212" height="206" rx="1.5" fill="none" style="stroke:var(--card-edge)"/>
+  </svg>
+  <div class="modes" role="group" aria-label="움직임">
+    <button type="button" data-mode="still">still</button>
+    <button type="button" data-mode="vertical">↕ vertical</button>
+    <button type="button" data-mode="horizontal">↔ horizontal</button>
+    <button type="button" data-mode="twisted">twisted</button>
+  </div>
+  <div class="row">
+    <label class="typed">글자 <input id="typed" type="text" value="overlap" maxlength="24" spellcheck="false" autocomplete="off" aria-label="보여 줄 글자"></label>
+    <button type="button" id="shuffle" class="chip">색 섞기</button>
+    <button type="button" id="original" class="chip" hidden>원래 색</button>
+  </div>
+  <div class="knobs" id="knobs" hidden>
+    <label>속도 <input id="k-speed" type="range" min="0.2" max="3" step="0.05" value="1"><output id="o-speed">1.0×</output></label>
+    <label><span id="k-range-name">높낮이</span> <input id="k-range" type="range" min="0.2" max="2.5" step="0.05" value="1"><output id="o-range">1.0×</output></label>
+  </div>
+</div>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const NS = 'http://www.w3.org/2000/svg';
+
+  // the seven outlines from the Figma frame "10.28"
+  const LETTERS = [
+    ['o', 'M70.3673 131.725C74.1887 131.725 77.4302 133.001 80.0763 135.555C82.7377 138.123 84.0489 141.886 84.0489 146.797C84.0489 151.543 82.8941 155.486 80.5665 158.608C78.2187 161.757 74.5828 163.313 69.713 163.313C65.636 163.313 62.3758 161.935 59.961 159.167V159.166C57.5506 156.385 56.3575 152.671 56.3575 148.05C56.3575 143.103 57.6133 139.134 60.1505 136.171C62.6914 133.204 66.1065 131.725 70.3673 131.725ZM70.2306 136.502C67.3084 136.502 65.2172 137.611 63.9063 139.814C62.5717 142.056 61.8986 144.77 61.8985 147.968C61.8985 151.038 62.5711 153.575 63.9005 155.596C65.207 157.582 67.2805 158.589 70.1759 158.589C71.7709 158.589 73.0965 158.289 74.1632 157.701C75.2272 157.115 76.0485 156.234 76.6271 155.051L76.8448 154.591C77.8983 152.279 78.4269 149.727 78.4269 146.933C78.4268 144.401 78.047 142.333 77.3009 140.716L77.1466 140.399C76.4762 139.093 75.5685 138.123 74.4259 137.478C73.2816 136.831 71.8866 136.502 70.2306 136.502Z'],
+    ['v', 'M92.2362 132.569L92.2919 132.741L99.8515 155.791L107.757 132.738L107.815 132.569H113.723L113.595 132.907L102.588 162.088L102.526 162.25H96.9482L96.8876 162.086L86.1259 132.906L86.0019 132.569H92.2362Z'],
+    ['e', 'M129.708 131.916C131.82 131.916 133.865 132.416 135.841 133.413L136.206 133.6C138.005 134.553 139.399 135.771 140.379 137.258L140.563 137.543C141.462 138.979 142.066 140.631 142.377 142.494L142.482 143.045C142.708 144.419 142.819 146.4 142.819 148.976V149.226H121.442C121.563 152.032 122.248 154.273 123.48 155.967L123.722 156.276C124.974 157.772 126.838 158.535 129.355 158.535C131.855 158.535 133.827 157.713 135.299 156.083C136.145 155.132 136.744 154.031 137.097 152.778L137.149 152.595H142.442L142.409 152.875C142.277 153.988 141.835 155.217 141.099 156.56C140.381 157.886 139.566 158.982 138.653 159.839C137.128 161.325 135.244 162.326 133.007 162.843C131.804 163.139 130.449 163.286 128.946 163.286C125.36 163.286 122.298 162.023 119.772 159.505L119.529 159.257C116.948 156.546 115.672 152.772 115.672 147.968C115.672 143.235 116.958 139.367 119.548 136.388C122.142 133.406 125.536 131.916 129.708 131.916ZM129.41 136.693C127.226 136.693 125.402 137.482 123.924 139.066L123.923 139.067C122.497 140.578 121.715 142.494 121.581 144.831H137.248C137.038 142.855 136.594 141.285 135.922 140.109H135.921C134.629 137.839 132.479 136.693 129.41 136.693Z'],
+    ['r', 'M163.199 137.78L162.903 137.724C162.621 137.671 162.358 137.636 162.114 137.619H162.112C161.884 137.601 161.627 137.592 161.342 137.592C158.93 137.592 157.109 138.37 155.84 139.9L155.839 139.901C154.551 141.436 153.908 143.204 153.908 145.216V162.25H148.504V132.57H153.663V136.838C154.18 136.023 154.979 135.112 156.048 134.109C157.581 132.651 159.358 131.916 161.369 131.916C161.471 131.916 161.635 131.926 161.852 131.944C162.073 131.962 162.448 131.999 162.975 132.053L163.199 132.077V137.78Z'],
+    ['l', 'M172.49 121.725V162.25H167.086V121.725H172.49Z'],
+    ['a', 'M191.067 131.861C194.313 131.861 197.011 132.44 199.143 133.616L199.562 133.859V133.86C201.77 135.219 202.87 137.339 202.87 140.176V156.987C202.87 157.46 202.961 157.814 203.124 158.069L203.186 158.142C203.356 158.309 203.683 158.426 204.255 158.426C204.464 158.426 204.702 158.417 204.967 158.399C205.233 158.364 205.516 158.32 205.818 158.266L206.112 158.215V162.325L205.93 162.377C205.165 162.595 204.57 162.736 204.152 162.793C203.736 162.849 203.178 162.877 202.483 162.877C200.727 162.877 199.412 162.248 198.594 160.963L198.593 160.962C198.236 160.393 197.976 159.641 197.803 158.717C196.803 159.878 195.457 160.891 193.77 161.759C191.861 162.742 189.76 163.231 187.47 163.231C184.71 163.231 182.429 162.395 180.651 160.711L180.649 160.709C178.891 159.007 178.011 156.878 178.011 154.343C178.011 151.581 178.876 149.408 180.63 147.862C182.364 146.333 184.631 145.4 187.412 145.051L195.231 144.069L195.426 144.04C196.381 143.876 196.985 143.45 197.298 142.793L197.3 142.789C197.493 142.404 197.601 141.822 197.601 141.02C197.601 139.417 197.032 138.299 195.921 137.609L195.918 137.607C194.794 136.881 193.151 136.503 190.958 136.503C188.437 136.503 186.712 137.182 185.707 138.476L185.706 138.477C185.146 139.189 184.765 140.273 184.586 141.759L184.559 141.979H179.504L179.51 141.722C179.6 138.19 180.712 135.646 182.9 134.165L183.115 134.024C185.411 132.58 188.065 131.861 191.067 131.861ZM197.465 147.584C196.907 147.883 196.239 148.137 195.464 148.345C194.51 148.603 193.571 148.786 192.651 148.896L192.652 148.897L189.682 149.278C187.914 149.513 186.617 149.88 185.769 150.365L185.768 150.366C184.346 151.171 183.633 152.446 183.633 154.235C183.633 155.582 184.121 156.624 185.091 157.39C186.079 158.17 187.25 158.562 188.615 158.562C190.3 158.562 191.933 158.172 193.517 157.389L193.519 157.388C194.847 156.742 195.83 155.897 196.482 154.858C197.134 153.819 197.465 152.57 197.465 151.101V147.584Z'],
+    ['p', 'M224.116 131.861C227.495 131.861 230.368 133.164 232.72 135.757C235.082 138.342 236.246 142.026 236.246 146.769C236.246 153.165 234.573 157.794 231.168 160.586C229.015 162.349 226.507 163.231 223.653 163.231C221.419 163.231 219.525 162.741 217.986 161.747V161.746C217.207 161.258 216.364 160.479 215.457 159.421V173.884H210.053V132.706H215.321V136.097C216.194 135.026 217.137 134.169 218.153 133.534C219.851 132.416 221.842 131.861 224.116 131.861ZM222.999 136.666C221.344 136.666 219.968 137.079 218.855 137.891C217.742 138.705 216.873 139.933 216.259 141.597C215.6 143.377 215.267 145.652 215.267 148.431C215.267 150.521 215.559 152.305 216.136 153.79L216.255 154.083V154.084C216.875 155.553 217.744 156.641 218.857 157.363C219.971 158.085 221.348 158.453 222.999 158.453C225.206 158.453 227.034 157.539 228.498 155.687L228.767 155.327C230.066 153.47 230.732 150.784 230.732 147.233C230.732 144.931 230.399 142.966 229.742 141.332V141.331C229.121 139.759 228.248 138.597 227.135 137.827C226.022 137.057 224.647 136.666 222.999 136.666Z'],
+  ];
+  const CARD = { x: 40, y: 40, w: 213, h: 207 };
+  const BASE = 162.25;   // the word's baseline
+  const SLICES = 48;     // a letter is cut into this many bands so it can twist
+
+  /* ---------- build the letters ---------- */
+  // "overlap" uses the outlines from the design; anything else typed is set in Helvetica Regular at the same size
+  const DEFAULT = 'overlap';
+  const FONT = '"Helvetica Neue", Helvetica, Arial, sans-serif';
+  const SIZE = 56.5;         // Helvetica at this size matches the design's letters
+  const TRACK = -0.9;        // the design sets the letters a touch tight
+  const COLOURS = ['o', 'v', 'e', 'r', 'l', 'a', 'p'];  // new words wear the design's seven colours in turn
+  const word = $('word'), defs = document.querySelector('#art defs');
+  const el = (tag, attrs) => { const n = document.createElementNS(NS, tag); for (const k in attrs) n.setAttribute(k, attrs[k]); return n; };
+  const measure = document.createElement('canvas').getContext('2d');
+  let letters = [];
+  let palette = null;  // null: the design's colours; otherwise a shuffled set, one per letter
+  let pivot = 147;  // the word's vertical middle: twisted letters stretch up and down from here
+
+  // one letter: the glyph in defs, its hidden copies, and the bands it twists in
+  function makeLetter(i, glyph, box, colour) {
+    glyph.setAttribute('id', 'glyph-' + i);
+    glyph.setAttribute('stroke-width', '0.5');
+    glyph.style.stroke = 'var(--stroke)';  // no fill here, so every copy can wear its own colour
+    defs.appendChild(glyph);
+    const copies = [];
+    for (let c = 0; c < 6; c++) {
+      const node = el('use', { href: '#glyph-' + i, display: 'none' });
+      word.appendChild(node);
+      copies.push({ node, x: 0, y: 0, vx: 0, vy: 0, tx: 0, ty: 0, next: 0, on: false });
+    }
+    const g = el('g', { class: 'letter' });
+    g.style.fill = colour;
+    word.appendChild(g);
+    // drawn whole while it isn't twisting, so the band seams never show
+    const whole = el('use', { href: '#glyph-' + i });
+    g.appendChild(whole);
+    const sliced = el('g', { display: 'none' });
+    g.appendChild(sliced);
+    const pad = 1, top = box.y - pad, h = box.height + pad * 2;
+    const bands = [];
+    for (let k = 0; k < SLICES; k++) {
+      const id = `band-${i}-${k}`;
+      const cp = el('clipPath', { id, class: 'built' });
+      cp.appendChild(el('rect', { x: box.x - 6, y: top + (h * k) / SLICES, width: box.width + 12, height: h / SLICES + 0.35 }));
+      defs.appendChild(cp);
+      const slice = el('g', { 'clip-path': `url(#${id})` });
+      slice.appendChild(el('use', { href: '#glyph-' + i }));
+      sliced.appendChild(slice);
+      bands.push(slice);
+    }
+    glyph.classList.add('built');
+    return {
+      g, whole, sliced, bands, box, cx: box.x + box.width / 2, copies,
+      // where it is now, where it's heading, and how fast
+      x: 0, y: 0, vx: 0, vy: 0, tx: 0, ty: 0,
+      sy: 1, vsy: 0, tsy: 1, twist: 0, vtwist: 0, ttwist: 0,
+      spin: Math.random() * Math.PI * 2, next: 0,
+    };
+  }
+
+  // the middle of everything the word covers, so stretching stays balanced
+  function centre() {
+    if (!letters.length) return;
+    const top = Math.min(...letters.map((L) => L.box.y)), bottom = Math.max(...letters.map((L) => L.box.y + L.box.height));
+    pivot = (top + bottom) / 2;
+  }
+  function build(text) {
+    word.textContent = '';
+    defs.querySelectorAll('.built').forEach((n) => n.remove());
+    letters = [];
+    if (text === DEFAULT) {
+      LETTERS.forEach(([ch, d], i) => {
+        const glyph = el('path', { d });
+        defs.appendChild(glyph);
+        const box = glyph.getBBox();
+        letters.push(makeLetter(i, glyph, box, palette ? palette[i % palette.length] : `var(--${ch})`));
+      });
+      centre();
+      return;
+    }
+    // set the line in Helvetica, shrinking it if it won't fit the card
+    const chars = [...text];
+    const maxW = CARD.w - 24;
+    let size = SIZE;
+    measure.font = `400 ${size}px ${FONT}`;
+    const advance = (c) => measure.measureText(c).width + TRACK * (size / SIZE);
+    let total = chars.reduce((w, c) => w + advance(c), 0);
+    if (total > maxW) { size *= maxW / total; measure.font = `400 ${size}px ${FONT}`; total = chars.reduce((w, c) => w + advance(c), 0); }
+    let x = CARD.x + (CARD.w - total) / 2, n = 0;
+    chars.forEach((c) => {
+      const m = measure.measureText(c);
+      if (c.trim()) {
+        const glyph = el('text', { x: x.toFixed(2), y: BASE, 'font-size': size.toFixed(2) });
+        glyph.style.fontFamily = FONT; glyph.style.fontWeight = '400';
+        glyph.textContent = c;
+        const box = {
+          x: x - m.actualBoundingBoxLeft, y: BASE - m.actualBoundingBoxAscent,
+          width: m.actualBoundingBoxLeft + m.actualBoundingBoxRight, height: m.actualBoundingBoxAscent + m.actualBoundingBoxDescent,
+        };
+        letters.push(makeLetter(n, glyph, box, palette ? palette[n % palette.length] : `var(--${COLOURS[n % COLOURS.length]})`));
+        n++;
+      }
+      x += advance(c);
+    });
+    centre();
+  }
+  build(DEFAULT);
+
+  /* ---------- the four modes ---------- */
+  // still:      as designed
+  // vertical:   each letter keeps to its own column and jumps up and down
+  // horizontal: each letter keeps to the baseline and darts left and right, sliding over the others
+  // twisted:    each letter stretches tall and twists around its own spine
+  const MODES = ['still', 'vertical', 'horizontal', 'twisted'];
+  let mode = 'still';
+  let energy = 0;  // a fast-moving pointer stirs everything up
+  const rnd = (a, b) => a + Math.random() * (b - a);
+
+  // a random bright colour, like the ones in the design
+  const randomColour = () => `hsl(${Math.round(rnd(0, 360))} ${Math.round(rnd(55, 100))}% ${Math.round(rnd(45, 78))}%)`;
+  // where a letter (or one of its copies) may go in the current mode
+  // speed and range for each moving mode, set with the two sliders
+  const knobs = { vertical: { speed: 1, range: 1 }, horizontal: { speed: 1, range: 1 }, twisted: { speed: 1, range: 1 } };
+  try { Object.assign(knobs, JSON.parse(localStorage.getItem('overlap-knobs') || '{}')); } catch (_) {}
+  const knob = () => knobs[mode] || { speed: 1, range: 1 };
+  function laneTarget(L) {
+    const R = knob().range;
+    if (mode === 'vertical') {
+      // like the design: the copies stay bunched around the word, never more than a letter or two away
+      const up = Math.min(42 * R, L.box.y - (CARD.y + 6)), down = Math.min(58 * R, CARD.y + CARD.h - 6 - (L.box.y + L.box.height));
+      return [0, rnd(-up, down)];
+    }
+    if (mode === 'horizontal') {
+      const left = Math.min(60 * R, L.box.x - (CARD.x + 4)), right = Math.min(60 * R, CARD.x + CARD.w - 4 - (L.box.x + L.box.width));
+      return [rnd(-left, right), 0];
+    }
+    return [0, 0];
+  }
+  function retargetCopy(L, c, now) {
+    [c.tx, c.ty] = c.on ? laneTarget(L) : [0, 0];
+    if (c.on && Math.random() < 0.25) c.node.style.fill = randomColour();
+    c.next = now + rnd(0.18, 0.6) / (1 + energy * 2) / knob().speed;
+  }
+  // in the two lane modes each letter scatters a few copies of itself, every one a different colour
+  function scatter(L, now) {
+    const lanes = mode === 'vertical' || mode === 'horizontal';
+    const n = lanes ? Math.floor(rnd(3, 6.99)) : 0;  // three to six copies a letter
+    L.copies.forEach((c, k) => {
+      c.on = k < n;
+      if (c.on) {
+        c.node.style.fill = randomColour();
+        c.node.setAttribute('display', 'inline');
+        // copies always sit behind the word, so the word reads as designed on top
+        word.insertBefore(c.node, word.firstChild);
+      }
+      c.next = now + rnd(0, 0.2);
+    });
+  }
+
+  function retarget(L, now) {
+    const calm = 1 / (1 + energy * 2);
+    if (mode === 'still') { L.tx = 0; L.ty = 0; L.tsy = 1; L.ttwist = 0; L.next = Infinity; return; }
+    const { speed, range } = knob();
+    if (mode === 'vertical' || mode === 'horizontal') {
+      // the word itself stays exactly as designed; only its copies move
+      L.tx = 0; L.ty = 0; L.tsy = 1; L.ttwist = 0;
+    } else {
+      L.tx = 0; L.ty = 0;
+      // stretched up and down from the word's middle, never further than the card's edges
+      const room = Math.min((pivot - (CARD.y + 6)) / Math.max(1, pivot - L.box.y), (CARD.y + CARD.h - 6 - pivot) / Math.max(1, L.box.y + L.box.height - pivot));
+      L.tsy = Math.min(room, 1 + rnd(0.4, 1.9) * range);
+      L.ttwist = rnd(0.5, 1.25) * range * (Math.random() < 0.5 ? -1 : 1);
+    }
+    L.next = now + (rnd(0.18, 0.6) * calm) / speed;
+  }
+  function setMode(m) {
+    mode = m;
+    const now = performance.now() / 1000;
+    letters.forEach((L) => { L.next = now + rnd(0, 0.15); if (m === 'still') retarget(L, now); scatter(L, now); });
+    document.querySelectorAll('.modes button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.mode === m)));
+    showKnobs();
+  }
+
+  function showKnobs() {
+    $('knobs').hidden = mode === 'still';
+    if (mode === 'still') return;
+    const k = knob();
+    $('k-speed').value = k.speed; $('k-range').value = k.range;
+    $('o-speed').textContent = (+k.speed).toFixed(1) + '×';
+    $('o-range').textContent = (+k.range).toFixed(1) + '×';
+    $('k-range-name').textContent = mode === 'twisted' ? '늘어남' : mode === 'vertical' ? '높낮이' : '폭';
+  }
+  ['speed', 'range'].forEach((name) => {
+    $('k-' + name).addEventListener('input', (e) => {
+      if (!knobs[mode]) return;
+      knobs[mode][name] = +e.target.value;
+      try { localStorage.setItem('overlap-knobs', JSON.stringify(knobs)); } catch (_) {}
+      showKnobs();
+      // pick new targets right away so the change is felt at once
+      const now = performance.now() / 1000;
+      letters.forEach((L) => { L.next = now; L.copies.forEach((c) => { c.next = now; }); });
+    });
+  });
+
+  /* ---------- motion: every value rides a spring toward its target, so the jumps overshoot and wobble ---------- */
+  const spring = (v, x, target, k, c, dt) => v + ((target - x) * k - v * c) * dt;
+  function step(L, now, dt) {
+    if (now >= L.next) retarget(L, now);
+    const S = knob().speed;
+    const k = (170 + energy * 160) * S * S, c0 = 9 * S;
+    L.vx = spring(L.vx, L.x, L.tx, k, c0, dt); L.x += L.vx * dt;
+    L.vy = spring(L.vy, L.y, L.ty, k, c0, dt); L.y += L.vy * dt;
+    L.vsy = spring(L.vsy, L.sy, L.tsy, 90 * S * S, 8 * S, dt); L.sy += L.vsy * dt;
+    L.vtwist = spring(L.vtwist, L.twist, L.ttwist, 60 * S * S, 7 * S, dt); L.twist += L.vtwist * dt;
+    L.spin += dt * S * (1.2 + Math.abs(L.twist) * 2.2);
+    for (const c of L.copies) {
+      if (now >= c.next) retargetCopy(L, c, now);
+      c.vx = spring(c.vx, c.x, c.tx, k, c0, dt); c.x += c.vx * dt;
+      c.vy = spring(c.vy, c.y, c.ty, k, c0, dt); c.y += c.vy * dt;
+      // a copy sent home disappears once it's back inside its letter
+      if (!c.on && c.node.getAttribute('display') !== 'none' && Math.abs(c.x) + Math.abs(c.y) < 0.6) c.node.setAttribute('display', 'none');
+    }
+  }
+  function draw(L) {
+    for (const c of L.copies) if (c.node.getAttribute('display') !== 'none') c.node.setAttribute('transform', `translate(${c.x.toFixed(2)} ${c.y.toFixed(2)})`);
+    // the whole letter: moved, and stretched both ways from the word's middle
+    L.g.setAttribute('transform', `translate(${L.x.toFixed(2)} ${L.y.toFixed(2)}) translate(0 ${pivot.toFixed(2)}) scale(1 ${L.sy.toFixed(3)}) translate(0 ${(-pivot).toFixed(2)})`);
+    // each band turns a little further round the letter's spine than the one below it
+    const tw = L.twist, twisting = Math.abs(tw) > 0.01;
+    L.whole.setAttribute('display', twisting ? 'none' : 'inline');
+    L.sliced.setAttribute('display', twisting ? 'inline' : 'none');
+    if (!twisting) return;
+    for (let k = 0; k < SLICES; k++) {
+      const u = k / (SLICES - 1) - 0.5;
+      const ang = tw * u * Math.PI + (Math.abs(tw) > 0.05 ? Math.sin(L.spin) * tw * 0.8 : 0);
+      const sx = Math.cos(ang), shift = Math.sin(ang) * L.box.width * 0.18;
+      L.bands[k].setAttribute('transform', `translate(${(L.cx + shift).toFixed(2)} 0) scale(${sx.toFixed(3)} 1) translate(${-L.cx} 0)`);
+    }
+  }
+
+  let last = performance.now() / 1000;
+  function frame() {
+    const now = performance.now() / 1000, dt = Math.min(0.033, now - last);
+    last = now;
+    energy *= Math.pow(0.25, dt);
+    letters.forEach((L) => { step(L, now, dt); draw(L); });
+    requestAnimationFrame(frame);
+  }
+
+  /* ---------- input ---------- */
+  // a click or tap moves to the next mode; the buttons and the keys 0-3 pick one directly
+  const nextMode = () => setMode(MODES[(MODES.indexOf(mode) + 1) % MODES.length]);
+  $('art').addEventListener('click', nextMode);
+  document.querySelectorAll('.modes button').forEach((b) => b.addEventListener('click', () => setMode(b.dataset.mode)));
+  addEventListener('keydown', (e) => {
+    if (e.target.id === 'typed') { if (e.code === 'Enter' || e.code === 'Escape') e.target.blur(); return; }  // typing a word, not picking modes
+    if (e.code === 'KeyC') { shuffleColours(); return; }
+    const i = ['Digit0', 'Digit1', 'Digit2', 'Digit3'].indexOf(e.code);
+    if (i >= 0) setMode(MODES[i]);
+    else if (e.code === 'Space' && e.target.tagName !== 'INPUT') { e.preventDefault(); nextMode(); }
+  });
+  let px = null, py = null, pt = 0;
+  addEventListener('pointermove', (e) => {
+    const t = performance.now() / 1000;
+    if (px !== null && t > pt) energy = Math.min(3, energy + Math.hypot(e.clientX - px, e.clientY - py) / (t - pt) / 4000);
+    px = e.clientX; py = e.clientY; pt = t;
+  });
+
+  // a new word replaces the letters straight away, in whatever mode is on
+  let saved = DEFAULT;
+  try { saved = localStorage.getItem('overlap-word') || DEFAULT; } catch (_) {}
+  $('typed').value = saved;
+  $('typed').addEventListener('input', (e) => {
+    const t = e.target.value.trim() ? e.target.value : DEFAULT;
+    build(t);
+    try { localStorage.setItem('overlap-word', t); } catch (_) {}
+    setMode(mode);
+  });
+  // a fresh colour for every letter; the copies keep drawing their own random colours as before
+  function shuffleColours() {
+    palette = Array.from({ length: Math.max(7, letters.length) }, randomColour);
+    letters.forEach((L, i) => { L.g.style.fill = palette[i]; });
+    $('original').hidden = false;
+  }
+  function originalColours() {
+    palette = null;
+    build($('typed').value.trim() ? $('typed').value : DEFAULT);
+    setMode(mode);
+    $('original').hidden = true;
+  }
+  ['shuffle', 'original'].forEach((id) => $(id).addEventListener('mousedown', (e) => e.preventDefault()));
+  $('shuffle').addEventListener('click', shuffleColours);
+  $('original').addEventListener('click', originalColours);
+  build(saved);
+  setMode('still');
+  requestAnimationFrame(frame);
+
+  // for checking by hand
+  window.__ov = { setMode, get letters() { return letters; }, type: (t) => { $('typed').value = t; $('typed').dispatchEvent(new Event('input')); } };
+})();
+</script>
+</body></html>

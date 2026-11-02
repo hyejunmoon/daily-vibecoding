@@ -1,0 +1,808 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><style>body{margin:0;font:14px system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style></head><body>
+<title>Daisies</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playwrite+AR&family=Cinzel:wght@600&display=swap">
+<style>
+  /* Layout: one misty screen. Lyric floats top-left, one daisy stands slightly right of center, controls rest bottom-right. */
+  /* One committed look: smoky black, like a fogged-up black album sleeve. */
+  :root {
+    color-scheme: dark;
+    --sky-top: #040405;
+    --sky-mid: #0b0b0d;
+    --sky-low: #141416;
+    --fog: rgba(170, 174, 180, 0.16);
+    --fog-soft: rgba(120, 124, 130, 0.12);
+    --ink: #ececea;
+    --ink-soft: #8b8d91;
+    --glow: rgba(220, 222, 225, 0.28);
+    --petal: #f5f5f2;
+    --petal-base: #efe3c4;
+    --petal-blush: #e9dde2;
+    --heart-a: #ffd25a;
+    --heart-b: #ea9a35;
+    --stem: #7f9a78;
+    --stem-deep: #4e6450;
+    --leaf: #637c5f;
+    --bloom: #3b3d42;
+    --bloom-heart: #4a4740;
+    --glass: rgba(255, 255, 255, 0.06);
+    --glass-strong: rgba(22, 22, 25, 0.9);
+    --glass-line: rgba(255, 255, 255, 0.14);
+    --solid: #ececea;
+    --solid-ink: #0b0b0d;
+    --vinyl: #0c0c0d;
+    --vinyl-groove: #1a1a1c;
+    --vinyl-label: #050506;
+    --vinyl-ink: #8e8f94;
+    --vinyl-sheen: rgba(255, 255, 255, 0.13);
+    --grain-opacity: 0.13;
+    --grain-blend: screen;
+
+    --font-lyric: "Playwrite AR", "Snell Roundhand", "Segoe Script", cursive;
+    --font-ui: "Playwrite AR", "Snell Roundhand", "Segoe Script", cursive;
+  }
+
+  [hidden] { display: none !important; }
+  html, body { height: 100%; }
+  body {
+    overflow: hidden;
+    background: linear-gradient(178deg, var(--sky-top) 0%, var(--sky-mid) 48%, var(--sky-low) 100%);
+    color: var(--ink);
+    font-family: var(--font-ui);
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* ---------- atmosphere ---------- */
+  .layer { position: fixed; inset: 0; pointer-events: none; }
+  .bloom { position: absolute; filter: blur(var(--b, 30px)); opacity: var(--o, 0.6); animation: drift var(--dur, 40s) ease-in-out infinite alternate; }
+  .bloom svg { width: 100%; height: 100%; display: block; overflow: visible; }
+  @keyframes drift {
+    from { transform: translate(0, 0) rotate(0deg); }
+    to { transform: translate(var(--dx, 30px), var(--dy, -20px)) rotate(var(--dr, 12deg)); }
+  }
+  #field { transform-origin: 50% 100%; }
+  .bg-daisy {
+    position: absolute; bottom: -4vh;
+    transform-origin: 50% 100%;
+    filter: blur(var(--b, 8px));
+    opacity: var(--o, 0.7);
+    animation: sway var(--dur, 6s) ease-in-out var(--delay, 0s) infinite alternate;
+  }
+  .bg-daisy svg { width: 100%; height: 100%; display: block; overflow: visible; }
+  @keyframes sway {
+    from { transform: rotate(calc(var(--amp, 3deg) * -1)); }
+    to { transform: rotate(var(--amp, 3deg)); }
+  }
+  .grain {
+    position: fixed; inset: -50px; pointer-events: none; z-index: 30;
+    opacity: var(--grain-opacity); mix-blend-mode: var(--grain-blend);
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .32  0 0 0 0 .34  0 0 0 0 .38  0 0 0 1.25 -.1'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+    animation: grain 1.1s steps(6) infinite;
+  }
+  @keyframes grain {
+    0% { transform: translate(0, 0); } 20% { transform: translate(-18px, 9px); } 40% { transform: translate(12px, -14px); }
+    60% { transform: translate(-7px, 20px); } 80% { transform: translate(20px, 4px); } 100% { transform: translate(0, 0); }
+  }
+  .haze { background: radial-gradient(110% 60% at 50% 105%, var(--fog), transparent 70%), radial-gradient(90% 50% at 15% 0%, var(--fog-soft), transparent 65%); }
+  .fog { position: absolute; width: 80vmax; height: 50vmax; border-radius: 50%; filter: blur(50px);
+    background: radial-gradient(closest-side, var(--fog), transparent);
+    animation: drift var(--dur, 60s) ease-in-out infinite alternate; }
+
+  /* ---------- the daisy ---------- */
+  #plant {
+    position: fixed; z-index: 10;
+    bottom: -3vh; left: 57%;
+    height: min(97vh, 1000px); aspect-ratio: 400 / 760; max-width: 100%;
+    transform: translateX(-50%);
+    overflow: visible;
+  }
+  .petal { cursor: pointer; }
+  #plant { touch-action: none; }
+  #stem-grip { cursor: grab; }
+  body.grabbing, body.grabbing * { cursor: grabbing !important; }
+  /* falling petals are flat cards turned in real 3D; CSS filters have no clipping box, unlike the SVG filter region */
+  #fall { position: fixed; inset: 0; z-index: 20; pointer-events: none; overflow: hidden; perspective: 900px; }
+  .fp { position: absolute; left: 0; top: 0; transform-style: preserve-3d; will-change: transform, opacity; }
+  .fp svg { display: block; width: 100%; height: 100%; overflow: visible; filter: blur(0.7px) drop-shadow(0 0 5px var(--glow)); }
+
+  /* ---------- lyric ---------- */
+  .lyric-wrap {
+    position: fixed; z-index: 25;
+    top: calc(env(safe-area-inset-top, 0px) + clamp(20px, 5vh, 56px));
+    left: max(clamp(20px, 4.5vw, 64px), env(safe-area-inset-left, 0px));
+    right: max(16px, env(safe-area-inset-right, 0px));
+    max-width: min(620px, 48vw);
+    display: flex; flex-direction: column; gap: 14px;
+    pointer-events: none;
+  }
+  .eyebrow {
+    margin: 0; font-family: var(--font-lyric); font-weight: 400;
+    font-size: 13px; letter-spacing: 0.06em; color: var(--ink-soft);
+    display: flex; align-items: center; gap: 18px;
+  }
+  .credit { display: flex; flex-direction: column; gap: 2px; line-height: 1.7; }
+  .credit-title { font-size: 17px; color: var(--ink); }
+
+  /* little record spinning beside the credit; the sheen stays put while the disc turns */
+  .vinyl {
+    position: relative; flex: none; width: 84px; height: 84px; border-radius: 50%;
+    appearance: none; border: 0; padding: 0; background: none; cursor: pointer; pointer-events: auto;
+    box-shadow: 0 0 22px var(--glow), 0 0 0 1px var(--glass-line);
+    transition: transform 0.3s ease, box-shadow 0.6s ease;
+  }
+  .vinyl:hover { transform: scale(1.07); }
+  .vinyl:focus-visible { outline: 2px solid var(--ink-soft); outline-offset: 4px; }
+  .vinyl.playing { box-shadow: 0 0 34px 4px var(--glow), 0 0 0 1px var(--ink-soft); }
+  .disc {
+    position: absolute; inset: 0; border-radius: 50%; display: grid; place-items: center;
+    background: repeating-radial-gradient(circle, var(--vinyl) 0 1px, var(--vinyl-groove) 1px 2px);
+    animation: spin 3.2s linear infinite;
+  }
+  .vinyl-label {
+    width: 48%; height: 48%; border-radius: 50%; display: grid; place-items: center;
+    background: var(--vinyl-label); box-shadow: 0 0 0 1px var(--glass-line);
+    font: 600 9px/1 "Cinzel", "Trajan Pro", Georgia, serif; letter-spacing: 0.1em; color: var(--vinyl-ink);
+  }
+  .vinyl::after {
+    content: ""; position: absolute; inset: 0; border-radius: 50%; pointer-events: none;
+    background: conic-gradient(from 20deg, transparent 0 8%, var(--vinyl-sheen) 13%, transparent 20% 52%, var(--vinyl-sheen) 60%, transparent 68%);
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .lyric {
+    margin: 0; min-height: 3em;
+    font-family: var(--font-lyric); font-weight: 400;
+    font-size: clamp(22px, 3.2vw, 44px); line-height: 1.55; letter-spacing: 0;
+    color: var(--ink); text-wrap: balance; word-break: keep-all; overflow-wrap: anywhere;
+    text-shadow: 0 0 28px var(--glow), 0 0 2px var(--glow);
+    transition: opacity 0.7s ease, filter 0.7s ease, transform 0.7s ease;
+  }
+  .lyric.swap { opacity: 0; filter: blur(12px); transform: translateY(-8px); }
+  .meta { display: flex; flex-direction: column; gap: 4px; font-size: 12px; line-height: 1.8; color: var(--ink-soft); }
+  .meta p { margin: 0; }
+  .count { font-variant-numeric: tabular-nums; letter-spacing: 0.04em; }
+
+  /* ---------- controls ---------- */
+  .controls {
+    position: fixed; z-index: 26;
+    right: max(20px, calc(env(safe-area-inset-right, 0px) + 16px));
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 22px);
+    display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px;
+  }
+  .pill {
+    appearance: none; border: 1px solid var(--glass-line); border-radius: 999px;
+    background: var(--glass); color: var(--ink);
+    -webkit-backdrop-filter: blur(14px) saturate(1.2); backdrop-filter: blur(14px) saturate(1.2);
+    font: 500 14px/1 var(--font-ui); padding: 11px 16px;
+    display: inline-flex; align-items: center; gap: 8px; cursor: pointer;
+    transition: background 0.25s ease, transform 0.25s ease;
+  }
+  .pill:hover { background: var(--glass-strong); transform: translateY(-1px); }
+  .pill:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+  .pill-quiet { padding: 11px 13px; color: var(--ink-soft); }
+  .pill-solid { background: var(--solid); color: var(--solid-ink); border-color: transparent; }
+  .pill-solid:hover { background: var(--solid); opacity: 0.9; }
+  .ico { font-size: 13px; width: 1em; text-align: center; }
+  .eq { display: inline-flex; gap: 2px; align-items: flex-end; height: 12px; }
+  .eq i { width: 2px; background: currentColor; border-radius: 1px; height: 4px; animation: eq 0.9s ease-in-out infinite alternate; }
+  .eq i:nth-child(2) { animation-delay: -0.3s; } .eq i:nth-child(3) { animation-delay: -0.6s; }
+  @keyframes eq { to { height: 12px; } }
+
+  /* ---------- lyrics panel ---------- */
+  .panel {
+    position: fixed; inset: 0; z-index: 40;
+    display: grid; place-items: center;
+    padding: 24px max(16px, env(safe-area-inset-right, 0px)) 24px max(16px, env(safe-area-inset-left, 0px));
+    background: color-mix(in srgb, var(--sky-mid) 40%, transparent);
+    -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+  }
+  .panel-card {
+    width: min(520px, 100%); max-height: 100%; overflow: auto;
+    display: flex; flex-direction: column; gap: 14px;
+    padding: 26px; border-radius: 26px;
+    background: var(--glass-strong); border: 1px solid var(--glass-line);
+    box-shadow: 0 30px 80px -30px rgba(60, 80, 95, 0.45);
+  }
+  .panel h2 { margin: 0; font-family: var(--font-lyric); font-weight: 400; font-size: 24px; line-height: 1.5; }
+  .panel-note { margin: 0; font-size: 14px; line-height: 1.65; color: var(--ink-soft); }
+  .panel textarea {
+    width: 100%; box-sizing: border-box; resize: vertical; min-height: 220px;
+    font: 16px/1.7 var(--font-ui); color: var(--ink);
+    background: var(--glass); border: 1px solid var(--glass-line); border-radius: 16px; padding: 14px 16px;
+  }
+  .panel textarea:focus-visible { outline: 2px solid var(--ink-soft); outline-offset: 2px; }
+  .panel-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .panel-actions { display: flex; gap: 8px; }
+  #line-count { font-size: 13px; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+
+  @media (max-width: 720px) {
+    #plant { left: 50%; height: 76vh; bottom: -2vh; }
+    .lyric-wrap { max-width: none; left: max(20px, env(safe-area-inset-left, 0px)); right: max(20px, env(safe-area-inset-right, 0px)); }
+    .controls { left: max(16px, env(safe-area-inset-left, 0px)); right: max(16px, env(safe-area-inset-right, 0px)); justify-content: center; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .bloom, .bg-daisy, .grain, .eq i { animation: none; }
+    .lyric { transition: opacity 0.3s ease; }
+  }
+</style>
+
+<!-- atmosphere -->
+<div class="layer" id="blooms" aria-hidden="true"></div>
+<div class="layer haze" aria-hidden="true">
+  <div class="fog" style="left:-25vmax;top:35vh;--dur:70s;--dx:18vw;--dy:-6vh;--dr:6deg"></div>
+  <div class="fog" style="right:-30vmax;top:-10vh;--dur:84s;--dx:-14vw;--dy:8vh;--dr:-8deg;opacity:.7"></div>
+  <div class="fog" style="left:20vw;bottom:-30vh;--dur:62s;--dx:-10vw;--dy:-4vh;--dr:4deg;opacity:.8"></div>
+</div>
+<div class="layer" id="field" aria-hidden="true"></div>
+
+<!-- the daisy -->
+<svg id="plant" viewBox="0 0 400 760" aria-label="A single daisy. Tap a petal to pluck it.">
+  <defs>
+    <linearGradient id="pg" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0" style="stop-color: var(--petal-base)"/>
+      <stop offset="0.38" style="stop-color: var(--petal)"/>
+      <stop offset="0.82" style="stop-color: var(--petal)"/>
+      <stop offset="1" style="stop-color: var(--petal-blush)"/>
+    </linearGradient>
+    <radialGradient id="heart" cx="0.45" cy="0.42" r="0.6">
+      <stop offset="0" style="stop-color: var(--heart-a)"/>
+      <stop offset="0.6" style="stop-color: var(--heart-b)"/>
+      <stop offset="1" style="stop-color: var(--heart-b); stop-opacity: 0"/>
+    </radialGradient>
+    <linearGradient id="stemGrad" gradientUnits="userSpaceOnUse" x1="0" y1="250" x2="0" y2="760">
+      <stop offset="0" style="stop-color: var(--stem)"/>
+      <stop offset="1" style="stop-color: var(--stem-deep); stop-opacity: 0.55"/>
+    </linearGradient>
+    <filter id="soft" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="2" result="b"/>
+      <feGaussianBlur in="SourceGraphic" stdDeviation="10" result="g"/>
+      <feColorMatrix in="g" type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 0.75 0" result="g2"/>
+      <feMerge><feMergeNode in="g2"/><feMergeNode in="b"/></feMerge>
+    </filter>
+    <filter id="fuzz" x="-50%" y="-50%" width="200%" height="200%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="4" result="t"/>
+      <feDisplacementMap in="SourceGraphic" in2="t" scale="7" xChannelSelector="R" yChannelSelector="G" result="d"/>
+      <feGaussianBlur in="d" stdDeviation="1.6"/>
+    </filter>
+    <filter id="stemBlur" x="-200%" y="-10%" width="500%" height="120%">
+      <feGaussianBlur stdDeviation="2.4"/>
+    </filter>
+  </defs>
+  <g id="sway">
+    <path d="M200,770 C194,620 216,430 200,262" fill="none" stroke="url(#stemGrad)" stroke-width="7" stroke-linecap="round" filter="url(#stemBlur)"/>
+    <path id="stem-grip" d="M200,770 C194,620 216,430 200,290" fill="none" stroke="transparent" stroke-width="46" stroke-linecap="round" pointer-events="stroke" aria-label="Stem. Drag side to side to shake the flower."/>
+    <path d="M203,585 C176,566 142,548 116,500 C156,512 186,540 204,566 Z" style="fill: var(--leaf)" opacity="0.6" filter="url(#stemBlur)"/>
+    <path d="M206,470 C232,452 262,440 286,398 C250,414 222,436 205,456 Z" style="fill: var(--leaf)" opacity="0.45" filter="url(#stemBlur)"/>
+    <g id="head">
+      <g filter="url(#soft)">
+        <g id="petals" transform="translate(200 250)"></g>
+        <g id="heart-g">
+          <circle cx="200" cy="250" r="30" fill="url(#heart)" filter="url(#fuzz)"/>
+          <circle cx="196" cy="246" r="12" style="fill: var(--heart-a)" opacity="0.55" filter="url(#stemBlur)"/>
+        </g>
+      </g>
+    </g>
+  </g>
+</svg>
+
+<div id="fall" aria-hidden="true"></div>
+
+<header class="lyric-wrap">
+  <p class="eyebrow"><span class="credit"><span class="credit-title">Daisies</span><span>Justin Bieber</span></span><button class="vinyl" id="vinyl" type="button" aria-label="Load music"><span class="disc"><span class="vinyl-label">SWAG</span></span></button></p>
+  <p id="lyric" class="lyric" aria-live="polite">pluck a petal</p>
+  <div class="meta" hidden>
+    <p id="count" class="count">16 of 16 petals left</p>
+    <p id="hint" hidden>Press L to add lyrics</p>
+  </div>
+</header>
+
+<div class="controls" hidden>
+  <button id="music-btn" class="pill" type="button"><span class="ico" id="music-ico">♪</span><span id="music-label">Load music</span></button>
+  <button id="music-change" class="pill pill-quiet" type="button" hidden>Change file</button>
+  <button id="lyrics-btn" class="pill" type="button">Add lyrics</button>
+  <input id="music-file" type="file" accept="audio/*,video/*,.m4a,.mp3,.mov,.wav" hidden>
+</div>
+<audio id="audio" loop preload="auto"></audio>
+
+<div id="panel" class="panel" role="dialog" aria-modal="true" aria-labelledby="panel-title" hidden>
+  <div class="panel-card">
+    <h2 id="panel-title">Lyrics for the petals</h2>
+    <p class="panel-note">One line per petal. Each petal you pluck shows the next line, starting from the top and looping back after the last one. Saved in this browser only.</p>
+    <textarea id="lyrics-input" rows="10" placeholder="first line&#10;second line&#10;third line"></textarea>
+    <div class="panel-row">
+      <span id="line-count">0 lines</span>
+      <div class="panel-actions">
+        <button id="panel-cancel" class="pill pill-quiet" type="button">Close</button>
+        <button id="panel-save" class="pill pill-solid" type="button">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="grain" aria-hidden="true"></div>
+
+<script>
+(() => {
+  const NS = 'http://www.w3.org/2000/svg';
+  const N = 10;
+  const STORE = 'daisies.lyrics.v1';
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const motion = reduce ? 0.12 : 1;
+  const $ = (id) => document.getElementById(id);
+  const rand = (a, b) => a + Math.random() * (b - a);
+
+  /* ---------- seeded random for a stable background ---------- */
+  let seed = 7;
+  const srand = (a, b) => { seed = (seed * 16807) % 2147483647; return a + ((seed - 1) / 2147483646) * (b - a); };
+
+  /* ---------- pink blooms (soft, blurred five-petal shapes) ---------- */
+  const blooms = [
+    { l: -8, t: 58, s: 46, b: 34, o: 0.5, dur: 46, dx: 40, dy: -30, dr: 14 },
+    { l: 70, t: -10, s: 34, b: 30, o: 0.38, dur: 52, dx: -30, dy: 26, dr: -10 },
+    { l: 18, t: 30, s: 18, b: 22, o: 0.3, dur: 38, dx: 24, dy: 18, dr: 20 },
+  ];
+  const bloomSvg = () => {
+    let c = '';
+    for (let i = 0; i < 5; i++) {
+      const a = (i / 5) * Math.PI * 2 - Math.PI / 2;
+      c += `<circle cx="${50 + Math.cos(a) * 22}" cy="${50 + Math.sin(a) * 22}" r="21" style="fill:var(--bloom)"/>`;
+    }
+    c += `<path d="M50,36 L55,46 L64,50 L55,54 L50,64 L45,54 L36,50 L45,46 Z" style="fill:var(--bloom-heart)"/>`;
+    return `<svg viewBox="0 0 100 100">${c}</svg>`;
+  };
+  blooms.forEach((b) => {
+    const el = document.createElement('div');
+    el.className = 'bloom';
+    el.style.cssText = `left:${b.l}vw;top:${b.t}vh;width:${b.s}vmax;height:${b.s}vmax;--b:${b.b}px;--o:${b.o};--dur:${b.dur}s;--dx:${b.dx}px;--dy:${b.dy}px;--dr:${b.dr}deg`;
+    el.innerHTML = bloomSvg();
+    $('blooms').appendChild(el);
+  });
+
+  /* ---------- background daisies, out of focus ---------- */
+  const field = $('field');
+  const bgCount = innerWidth < 720 ? 7 : 12;
+  for (let i = 0; i < bgCount; i++) {
+    const h = srand(38, 92);
+    const near = h > 75;
+    const el = document.createElement('div');
+    el.className = 'bg-daisy';
+    el.style.cssText = `left:${(i / bgCount) * 100 + srand(-4, 4)}vw;height:${h}vh;width:${h * 0.32}vh;` +
+      `--b:${near ? srand(10, 16) : srand(4, 9)}px;--o:${srand(0.16, 0.45)};--dur:${srand(4.5, 8)}s;--delay:${srand(-6, 0)}s;--amp:${srand(1.5, 4)}deg`;
+    const lean = srand(-14, 14), squash = srand(0.45, 0.9), tilt = srand(-30, 30);
+    let petals = '';
+    for (let k = 0; k < 13; k++) {
+      petals += `<ellipse cx="0" cy="-20" rx="6.5" ry="19" transform="rotate(${(k / 13) * 360})" style="fill:var(--petal)" opacity="0.92"/>`;
+    }
+    el.innerHTML = `<svg viewBox="0 0 100 400" preserveAspectRatio="xMidYMax meet">
+      <path d="M50,400 C48,300 ${50 + lean * 0.4},180 ${50 + lean},58" fill="none" style="stroke:var(--stem)" stroke-width="2.2" opacity="0.8"/>
+      <g transform="translate(${50 + lean} 58) rotate(${tilt}) scale(1 ${squash})">${petals}
+        <circle r="8" fill="url(#heart)"/></g></svg>`;
+    field.appendChild(el);
+  }
+
+  /* ---------- the main daisy ---------- */
+  const petalsG = $('petals');
+  const sway = $('sway');
+  const head = $('head');
+  const fall = $('fall');
+  const petalD = (L, W) =>
+    `M0,-14 C${W * 0.7},-30 ${W},-${L * 0.6} ${W * 0.46},-${L - 7} C${W * 0.22},-${L + 1} -${W * 0.22},-${L + 1} -${W * 0.46},-${L - 7} C-${W},-${L * 0.6} -${W * 0.7},-30 0,-14Z`;
+
+  const states = [];
+  const t0 = performance.now();
+  for (let i = 0; i < N; i++) {
+    const L = rand(100, 114), W = rand(24, 28);
+    const slot = document.createElementNS(NS, 'g');
+    const path = document.createElementNS(NS, 'path');
+    const d = petalD(L, W);
+    path.setAttribute('d', d);
+    path.setAttribute('fill', 'url(#pg)');
+    path.setAttribute('class', 'petal');
+    slot.appendChild(path);
+    petalsG.appendChild(slot);
+    const s = { i, slot, path, d, L, a: (i / N) * 360 + rand(-4, 4), phase: rand(0, 6.28),
+      scale: 0, from: 0, growing: true, growStart: t0 + 350, removed: false, hover: false };
+    path.__s = s;
+    states.push(s);
+  }
+  let remaining = N;
+  let regrowing = false;
+  // Every petal pops out of the center at the same moment, and the heart gives a little bounce.
+  const GROW = 620;
+  let popAt = t0 + 350;
+
+  petalsG.addEventListener('pointerover', (e) => { const s = e.target.__s; if (s) s.hover = true; });
+  petalsG.addEventListener('pointerout', (e) => { const s = e.target.__s; if (s) s.hover = false; });
+  petalsG.addEventListener('click', (e) => { const s = e.target.__s; if (s) pluck(s); });
+
+  /* ---------- grab the stem and shake ---------- */
+  // The stem bends toward the pointer while held and springs back when let go. The faster it is shaken,
+  // the more petals let go: a gentle wiggle drops 1-2, a hard shake up to 7.
+  const plant = $('plant');
+  const grip = $('stem-grip');
+  let drag = null;
+  let bend = 0, bendVel = 0, shakeSpeed = 0, shakeDropped = 0, shakeAllowed = 0, lastShakeDrop = 0;
+  const pointerAngle = (e) => {
+    const base = new DOMPoint(200, 760).matrixTransform(plant.getScreenCTM());
+    return Math.atan2(e.clientX - base.x, base.y - e.clientY) * 180 / Math.PI;
+  };
+  grip.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    try { grip.setPointerCapture(e.pointerId); } catch (err) {}
+    drag = { id: e.pointerId, a0: pointerAngle(e) - bend / 1.6, target: bend };
+    shakeSpeed = 0; shakeDropped = 0; shakeAllowed = 0;
+    document.body.classList.add('grabbing');
+  });
+  grip.addEventListener('pointermove', (e) => {
+    if (!drag || e.pointerId !== drag.id) return;
+    // a little leverage, so a small hand movement still bends the stem visibly
+    drag.target = Math.max(-26, Math.min(26, (pointerAngle(e) - drag.a0) * 1.6));
+  });
+  const letGo = (e) => {
+    if (!drag || e.pointerId !== drag.id) return;
+    drag = null;
+    document.body.classList.remove('grabbing');
+    // one lyric line per shake, like a breath of wind
+    if (shakeDropped) showLyric(nextLine());
+  };
+  grip.addEventListener('pointerup', letGo);
+  grip.addEventListener('pointercancel', letGo);
+
+  /* ---------- falling petals ---------- */
+  const falling = [];
+  let gust = 0;
+
+  function pluck(s, wind = 0, dir = 1) {
+    if (s.removed || s.growing) return;
+    const m = s.path.getScreenCTM();
+    if (!m) return;
+    const mid = new DOMPoint(0, -s.L / 2 - 7).matrixTransform(m);
+    const angle = Math.atan2(m.b, m.a) * 180 / Math.PI;
+    const sc = Math.hypot(m.a, m.b);
+    s.removed = true;
+    s.hover = false;
+    s.path.style.display = 'none';
+    remaining--;
+
+    // the box is centred on the petal's middle, so it turns around its own centre of mass
+    const w = 64 * sc, h = (s.L - 6) * sc;
+    const el = document.createElement('div');
+    el.className = 'fp';
+    el.style.width = `${w}px`;
+    el.style.height = `${h}px`;
+    el.innerHTML = `<svg viewBox="-32 ${-s.L - 4} 64 ${s.L - 6}"><path d="${s.d}" fill="url(#pg)"/>` +
+      `<path class="shade" d="${s.d}" style="fill: var(--sky-top)" opacity="0"/></svg>`;
+    fall.appendChild(el);
+    const out = (angle - 90) * Math.PI / 180;
+    falling.push({ el, shade: el.querySelector('.shade'), w, h, x0: mid.x, x: mid.x, y: mid.y,
+      vy: -30 + Math.sin(out) * 25 - wind * rand(40, 90),
+      push: Math.cos(out) * 50 + dir * wind * rand(160, 320),
+      rz0: angle, t: 0, om: rand(1.5, 2.3), amp: rand(30, 58), phi: rand(0, 6.28), yaw0: rand(0, 6.28),
+      base: rand(30, 46), tumble: rand(0.4, 1) * (Math.random() < 0.5 ? -1 : 1) * (1 + wind),
+      drift: rand(-14, 22) + dir * wind * rand(20, 70), spin: rand(-8, 8) + dir * wind * rand(20, 60) });
+
+    gust = Math.min(1.5, gust + 0.55);
+    // a blown burst shows one line when the wind dies down, instead of racing through a line per petal
+    if (!wind) showLyric(nextLine());
+    updateCount();
+    if (remaining === 0) setTimeout(regrow, 1800);
+  }
+
+  function regrow() {
+    regrowing = true;
+    updateCount();
+    const now = performance.now();
+    popAt = now + 250;
+    states.forEach((s) => {
+      s.removed = false;
+      s.path.style.display = '';
+      s.scale = 0; s.from = 0;
+      s.growing = true;
+      s.growStart = popAt;
+    });
+    remaining = N;
+    gust = Math.min(1.5, gust + 0.8);
+    setTimeout(() => { regrowing = false; updateCount(); }, 250 + GROW + 300);
+  }
+
+  /* ---------- lyrics ---------- */
+  const FALLBACK = ['loves me', 'loves me not'];
+  let lines = [];
+  try { lines = JSON.parse(localStorage.getItem(STORE) || '[]'); } catch (e) { lines = []; }
+  if (!Array.isArray(lines)) lines = [];
+  // Lines play in order, one per petal; the sequence carries over when the flower regrows and starts over after the last line.
+  let cursor = 0;
+  let shown = 0;
+  const pool = () => (lines.length ? lines : FALLBACK);
+  function nextLine() {
+    const src = pool();
+    if (cursor >= src.length) cursor = 0;
+    shown = cursor + 1;
+    return src[cursor++];
+  }
+  const lyricEl = $('lyric');
+  let swapTimer;
+  function showLyric(text) {
+    clearTimeout(swapTimer);
+    lyricEl.classList.add('swap');
+    swapTimer = setTimeout(() => {
+      lyricEl.textContent = text;
+      lyricEl.classList.remove('swap');
+    }, reduce ? 150 : 420);
+  }
+  function updateCount() {
+    const petals = regrowing ? 'blooming again…' : `${remaining} of ${N} petals left`;
+    $('count').textContent = lines.length && shown ? `${petals} · line ${shown} of ${lines.length}` : petals;
+  }
+  function refreshLyricUi() {
+    $('lyrics-btn').textContent = lines.length ? `Lyrics · ${lines.length} lines` : 'Add lyrics';
+  }
+  refreshLyricUi();
+
+  const panel = $('panel');
+  const input = $('lyrics-input');
+  const countLines = (v) => v.split('\n').map((x) => x.trim()).filter(Boolean);
+  const syncLineCount = () => { $('line-count').textContent = `${countLines(input.value).length} lines`; };
+  function openPanel() { input.value = lines.join('\n'); syncLineCount(); panel.hidden = false; input.focus(); }
+  function closePanel() { panel.hidden = true; $('lyrics-btn').focus(); }
+  $('lyrics-btn').addEventListener('click', openPanel);
+  $('panel-cancel').addEventListener('click', closePanel);
+  panel.addEventListener('click', (e) => { if (e.target === panel) closePanel(); });
+  input.addEventListener('input', syncLineCount);
+  $('panel-save').addEventListener('click', () => {
+    lines = countLines(input.value);
+    try { localStorage.setItem(STORE, JSON.stringify(lines)); } catch (e) {}
+    cursor = 0;
+    shown = 0;
+    refreshLyricUi();
+    updateCount();
+    closePanel();
+    showLyric(lines.length ? 'pluck a petal' : nextLine());
+  });
+
+  /* ---------- music (local file, never uploaded) ---------- */
+  const audio = $('audio');
+  const fileInput = $('music-file');
+  const vinyl = $('vinyl');
+  let objectUrl = null;
+  let fadeRaf;
+
+  // The chosen track is kept in this browser (IndexedDB) so the record plays on the next visit without picking the file again.
+  const idb = (mode, fn) => new Promise((resolve, reject) => {
+    const req = indexedDB.open('daisies', 1);
+    req.onupgradeneeded = () => req.result.createObjectStore('audio');
+    req.onerror = () => reject(req.error);
+    req.onsuccess = () => {
+      const tx = req.result.transaction('audio', mode);
+      const r = fn(tx.objectStore('audio'));
+      tx.oncomplete = () => resolve(r && r.result);
+      tx.onerror = () => reject(tx.error);
+    };
+  });
+  const saveTrack = (blob) => idb('readwrite', (s) => s.put(blob, 'track')).catch(() => {});
+  function useTrack(blob) {
+    if (objectUrl) URL.revokeObjectURL(objectUrl);
+    objectUrl = URL.createObjectURL(blob);
+    audio.src = objectUrl;
+  }
+  try {
+    idb('readonly', (s) => s.get('track')).then((blob) => { if (blob && !audio.src) { useTrack(blob); setMusicUi(); } }).catch(() => {});
+  } catch (e) {}
+  function setMusicUi() {
+    const playing = !audio.paused;
+    $('music-ico').innerHTML = !audio.src ? '♪' : playing ? '<span class="eq"><i></i><i></i><i></i></span>' : '▶';
+    $('music-label').textContent = !audio.src ? 'Load music' : playing ? 'Pause' : 'Play';
+    $('music-change').hidden = !audio.src;
+    vinyl.classList.toggle('playing', playing);
+    vinyl.setAttribute('aria-label', !audio.src ? 'Load music' : playing ? 'Pause music' : 'Play music');
+  }
+  function fadeTo(target, ms, done) {
+    cancelAnimationFrame(fadeRaf);
+    const start = audio.volume, t = performance.now();
+    const step = (now) => {
+      const k = Math.min(1, (now - t) / ms);
+      audio.volume = start + (target - start) * k;
+      if (k < 1) fadeRaf = requestAnimationFrame(step); else if (done) done();
+    };
+    fadeRaf = requestAnimationFrame(step);
+  }
+  function play() { audio.volume = 0; audio.play().then(() => fadeTo(0.85, 1600)).catch(() => {}).finally(setMusicUi); }
+  $('music-btn').addEventListener('click', () => {
+    if (!audio.src) { fileInput.click(); return; }
+    if (audio.paused) play(); else fadeTo(0, 500, () => { audio.pause(); setMusicUi(); });
+  });
+  $('music-change').addEventListener('click', () => fileInput.click());
+  // Click the record to play or pause; shift-click (or the first click with no track yet) picks a file.
+  vinyl.addEventListener('click', (e) => {
+    if (e.shiftKey) fileInput.click(); else $('music-btn').click();
+  });
+  fileInput.addEventListener('change', () => {
+    const f = fileInput.files && fileInput.files[0];
+    if (!f) return;
+    useTrack(f);
+    saveTrack(f);
+    play();
+    fileInput.value = '';
+  });
+  audio.addEventListener('play', setMusicUi);
+  audio.addEventListener('pause', setMusicUi);
+
+  /* ---------- blowing into the microphone ---------- */
+  // Only where the browser lets a page use the microphone (an https site or a local file); elsewhere it stays off quietly.
+  let blow = 0;
+  let micCtx = null;
+  async function startMic() {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: false, autoGainControl: false },
+      });
+      micCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const an = micCtx.createAnalyser();
+      an.fftSize = 1024;
+      an.smoothingTimeConstant = 0.2;
+      micCtx.createMediaStreamSource(stream).connect(an);
+      const time = new Float32Array(an.fftSize);
+      const freq = new Float32Array(an.frequencyBinCount);
+      const binHz = micCtx.sampleRate / an.fftSize;
+      const lo = Math.max(1, Math.round(80 / binHz)), hi = Math.round(4000 / binHz);
+      let floor = 0.01, held = 0;
+      // Breath on a mic is loud, noise-like rumble: high level plus a flat spectrum, unlike voice or music.
+      setInterval(() => {
+        an.getFloatTimeDomainData(time);
+        let sum = 0;
+        for (let i = 0; i < time.length; i++) sum += time[i] * time[i];
+        const rms = Math.sqrt(sum / time.length);
+        an.getFloatFrequencyData(freq);
+        let logSum = 0, linSum = 0;
+        for (let i = lo; i < hi; i++) {
+          const p = Number.isFinite(freq[i]) ? Math.pow(10, freq[i] / 10) : 0;
+          linSum += p; logSum += Math.log(p + 1e-12);
+        }
+        const n = hi - lo;
+        const flat = Math.exp(logSum / n) / (linSum / n + 1e-12);
+        floor = rms < floor ? floor * 0.9 + rms * 0.1 : floor * 0.998 + rms * 0.002;
+        const thresh = Math.max(0.05, floor * 4);
+        held = rms > thresh && flat > 0.1 ? held + 1 : 0;
+        const target = held >= 3 ? Math.min(1, 0.3 + (rms - thresh) / 0.2) : 0;
+        blow += (target - blow) * (target > blow ? 0.5 : 0.12);
+      }, 30);
+      if (lyricEl.textContent === 'pluck a petal') showLyric('pluck a petal, or blow');
+    } catch (e) {
+      micCtx = null;
+    }
+  }
+  // startMic(); — blowing was dropped, so this copy never asks for the microphone
+  const wakeMic = () => { if (micCtx && micCtx.state === 'suspended') micCtx.resume(); };
+  addEventListener('pointerdown', wakeMic);
+  addEventListener('keydown', wakeMic);
+
+  /* ---------- keyboard: space / enter plucks a petal ---------- */
+  document.addEventListener('keydown', (e) => {
+    if (!panel.hidden) { if (e.key === 'Escape') closePanel(); return; }
+    if (e.target.closest && e.target.closest('button, textarea, input')) return;
+    // The on-screen buttons are gone; lyrics and music stay reachable from the keyboard.
+    if (e.key === 'l' || e.key === 'L') { e.preventDefault(); openPanel(); return; }
+    if (e.key === 'm' || e.key === 'M') { e.preventDefault(); $('music-btn').click(); return; }
+    if (e.key === ' ' || e.key === 'Enter') {
+      e.preventDefault();
+      const left = states.filter((s) => !s.removed && !s.growing);
+      if (left.length) pluck(left[Math.floor(Math.random() * left.length)]);
+    }
+  });
+
+  /* ---------- animation loop ---------- */
+  const DEG = Math.PI / 180;
+  const easeOutBack =(p) => { const c = 2.6; return 1 + (c + 1) * Math.pow(p - 1, 3) + c * Math.pow(p - 1, 2); };
+  const heartG = $('heart-g');
+  let prev = performance.now();
+  let blowAcc = 0, inBurst = false, lean = 0;
+  function frame(now) {
+    const dt = Math.min(50, now - prev) / 1000;
+    prev = now;
+    const T = now / 1000;
+    gust *= Math.pow(0.35, dt);
+
+    // breath: the whole field leans away, and petals let go faster the harder you blow
+    if (blow > 0.05) {
+      gust = Math.max(gust, 0.8 + blow * 1.6);
+      blowAcc += dt * (4 + blow * 16);
+      inBurst = true;
+      while (blowAcc >= 1) {
+        blowAcc -= 1;
+        const left = states.filter((s) => !s.removed && !s.growing);
+        if (!left.length) break;
+        pluck(left[Math.floor(Math.random() * left.length)], 0.5 + blow);
+      }
+    } else {
+      blowAcc = 0;
+      if (inBurst) { inBurst = false; showLyric(nextLine()); }
+    }
+    lean += (blow * 7 - lean) * Math.min(1, dt * (blow > lean / 7 ? 6 : 2));
+    field.style.transform = `skewX(${(-lean * 0.7).toFixed(2)}deg)`;
+
+    // stem: follows the hand while held, then a damped spring swings it back to rest
+    const prevBend = bend;
+    if (drag) {
+      bend += (drag.target - bend) * Math.min(1, dt * 18);
+      bendVel = (bend - prevBend) / Math.max(dt, 0.001);
+      shakeSpeed += (Math.abs(bendVel) - shakeSpeed) * Math.min(1, dt * 14);
+      // deg/s of swing -> how many petals this shake may knock loose (0 below a slow sway, 7 at most)
+      const allow = shakeSpeed < 25 ? 0 : Math.min(7, Math.round(1 + (shakeSpeed - 25) / 55));
+      shakeAllowed = Math.max(shakeAllowed, allow);
+      if (shakeDropped < shakeAllowed && now - lastShakeDrop > 90) {
+        const left = states.filter((s) => !s.removed && !s.growing);
+        if (left.length) {
+          lastShakeDrop = now;
+          shakeDropped++;
+          pluck(left[Math.floor(Math.random() * left.length)], 0.3 + Math.min(1, shakeSpeed / 500), Math.sign(bendVel) || 1);
+        }
+      }
+    } else {
+      bendVel += (-60 * bend - 5 * bendVel) * dt;
+      bend += bendVel * dt;
+    }
+    const whip = Math.max(-9, Math.min(9, -bendVel * 0.015));
+
+    const rot = bend + lean + (Math.sin(T * 0.55) * 1.9 + Math.sin(T * 1.33 + 1) * 0.7) * motion + gust * Math.sin(T * 3.1) * 2.4 * motion;
+    sway.setAttribute('transform', `rotate(${rot.toFixed(3)} 200 760)`);
+    const hr = whip + lean * 0.6 +Math.sin(T * 0.8 + 0.6) * 2.8 * motion + gust * Math.sin(T * 4.2) * 3 * motion;
+    head.setAttribute('transform', `rotate(${hr.toFixed(3)} 200 250)`);
+
+    // heart squashes in just before the pop, then springs back
+    const hp = (now - popAt) / 700;
+    let hk = 1;
+    if (hp > -0.35 && hp < 0) hk = 1 - 0.18 * Math.sin(((hp + 0.35) / 0.35) * Math.PI / 2);
+    else if (hp >= 0 && hp < 1) hk = 1 + 0.32 * Math.sin(hp * Math.PI) * (1 - hp);
+    heartG.setAttribute('transform', `translate(200 250) scale(${hk.toFixed(3)}) translate(-200 -250)`);
+
+    for (const s of states) {
+      if (s.growing) {
+        const p = (now - s.growStart) / GROW;
+        if (p <= 0) s.scale = s.from;
+        else if (p >= 1) { s.scale = 1; s.growing = false; }
+        else s.scale = s.from + (1 - s.from) * easeOutBack(p);
+      } else if (!s.removed) {
+        s.scale += ((s.hover ? 1.08 : 1) - s.scale) * Math.min(1, dt * 12);
+      }
+      if (s.removed) continue;
+      const j = Math.sin(T * 1.7 + s.phase) * 1.4 * motion;
+      s.slot.setAttribute('transform', `rotate(${(s.a + j).toFixed(2)})`);
+      s.path.setAttribute('transform', `scale(${Math.max(0, s.scale).toFixed(3)})`);
+    }
+
+    const H = innerHeight;
+    for (let k = falling.length - 1; k >= 0; k--) {
+      const f = falling[k];
+      f.t += dt;
+      const ramp = Math.min(1, f.t / 1.2);
+      const th = f.t * f.om + f.phi;
+      // pendulum glide: drops fastest through the middle of each swing and hangs at the ends
+      const target = f.base + 38 * Math.cos(th) * Math.cos(th);
+      f.vy += (target - f.vy) * Math.min(1, dt * 2.5);
+      f.y += f.vy * dt * (reduce ? 1.6 : 1);
+      f.push *= Math.pow(0.2, dt);
+      f.x0 += (f.drift + f.push) * dt;
+      f.x = f.x0 + Math.sin(th) * f.amp * ramp * motion;
+      // lean into each swing, tip back and forth, and slowly turn over
+      const rz = f.rz0 + (-28 * Math.cos(th) * ramp + f.spin * f.t) * motion;
+      const rx = (38 + 22 * Math.sin(th * 0.5 + f.yaw0)) * ramp * motion;
+      const ry = (Math.sin(th) * 50 * ramp + f.tumble * f.t * 40) * motion;
+      // darker as the petal turns edge-on, so it reads as a thin curved thing in space
+      const nz = Math.cos(rx * DEG) * Math.cos(ry * DEG);
+      f.shade.setAttribute('opacity', ((1 - Math.abs(nz)) * 0.55).toFixed(3));
+      const fade = Math.max(0, Math.min(1, (H + 40 - f.y) / (H * 0.25), (16 - f.t) / 2));
+      f.el.style.transform = `translate3d(${(f.x - f.w / 2).toFixed(1)}px, ${(f.y - f.h / 2).toFixed(1)}px, 0) ` +
+        `rotateZ(${rz.toFixed(1)}deg) rotateX(${rx.toFixed(1)}deg) rotateY(${ry.toFixed(1)}deg)`;
+      f.el.style.opacity = fade.toFixed(3);
+      if (fade <= 0) { f.el.remove(); falling.splice(k, 1); }
+    }
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+})();
+</script>
+</body></html>

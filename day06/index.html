@@ -1,0 +1,712 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><style>body{margin:0;font:14px system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style></head><body><title>Life Archive</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Jost:wght@400;500;700;800&family=Gowun+Dodum&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #d9d6d0;
+    --ink: #1c1b19;
+    --muted: #77736b;
+    --red: #d7262c;
+    --paper: #f1ece1;
+    --sans: "Jost", "Helvetica Neue", Arial, sans-serif;
+    --ko: "Gowun Dodum", "Apple SD Gothic Neo", sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --bg: #d9d6d0; }
+  }
+  :root[data-theme="dark"] { --bg: #d9d6d0; }
+
+  html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); color: var(--ink); }
+  body { font-family: var(--sans); -webkit-font-smoothing: antialiased; overscroll-behavior: none; }
+
+  .bg { position: fixed; inset: 0; background: center / cover no-repeat; opacity: 0; transition: opacity 1.8s ease; }
+  .bg.on { opacity: 1; }
+  .scrim { position: fixed; inset: 0; pointer-events: none;
+    background: linear-gradient(to bottom, rgba(0,0,0,.05) 0%, rgba(0,0,0,0) 45%, rgba(0,0,0,.35) 100%); }
+  .stage {
+    position: fixed; inset: 0; overflow: hidden;
+    perspective: 1700px; perspective-origin: 50% 32%;
+    touch-action: none; cursor: default;
+  }
+  .track {
+    position: absolute; left: 0; bottom: 21vh;
+    display: flex; align-items: flex-end; gap: 9px;
+    padding: 0 7vw;
+    transform-style: preserve-3d; will-change: transform;
+  }
+
+  .book { cursor: pointer; position: relative; flex: none; width: var(--T); height: var(--h);
+    transform-style: preserve-3d; transition: width .62s cubic-bezier(.22,.8,.24,1); }
+  .book.open { width: var(--W); }
+  .shadow { position: absolute; left: -14%; right: -14%; bottom: -9px; height: 16px;
+    background: radial-gradient(ellipse at center, rgba(40,34,26,.32), rgba(40,34,26,0) 70%);
+    transition: opacity .35s, transform .35s; pointer-events: none; }
+  .book.lift .shadow { opacity: .6; transform: scaleX(.9); }
+
+  .lifter { position: absolute; inset: 0; transform-style: preserve-3d;
+    transition: transform .42s cubic-bezier(.3,1.7,.5,1); }
+  .book.lift .lifter { transform: translateY(-9px); }
+
+  .box { position: absolute; left: 50%; top: 0; width: var(--T); height: 100%;
+    margin-left: calc(var(--T) / -2); transform-style: preserve-3d;
+    transform: translateZ(calc(var(--W) / -2)) rotateY(0deg);
+    transition: transform .62s cubic-bezier(.22,.8,.24,1); }
+  .book.open .box { transform: translateZ(calc(var(--T) / -2)) rotateY(90deg); }
+
+  .face { position: absolute; top: 0; height: 100%; backface-visibility: hidden; -webkit-backface-visibility: hidden; overflow: hidden; }
+  .face::after { content: ""; position: absolute; inset: 0; background: #000; opacity: 0; transition: opacity .62s; pointer-events: none; }
+  .spine { left: 0; width: var(--T); transform: translateZ(calc(var(--W) / 2));
+    background: var(--sp, var(--paper)); box-shadow: inset 1px 0 0 rgba(255,255,255,.5), inset -1px 0 0 rgba(0,0,0,.12); }
+  .book.open .spine::after { opacity: .5; }
+  .cover { left: calc((var(--T) - var(--W)) / 2); width: var(--W);
+    transform: rotateY(-90deg) translateZ(calc(var(--T) / 2)); background: #222; }
+  .cover::after { opacity: .45; }
+  .book.open .cover::after { opacity: 0; }
+  .cover canvas { display: block; width: 100%; height: 100%; }
+  .cover .go { position: absolute; inset: 0; z-index: 1; }
+  .book:not(.open) .go { pointer-events: none; }
+  .back { left: calc((var(--T) - var(--W)) / 2); width: var(--W);
+    transform: rotateY(90deg) translateZ(calc(var(--T) / 2)); background: var(--paper); }
+
+  .spine .logo { position: absolute; left: 3px; right: 3px; top: 7px; aspect-ratio: 1.9 / 1;
+    background: var(--red); color: #fff; display: grid; place-items: center;
+    font-weight: 700; font-size: calc(var(--T) * .3); letter-spacing: -.02em; line-height: 1; }
+  .spine .txt { position: absolute; left: 0; right: 0; top: calc(var(--T) * .78 + 14px); bottom: 10px;
+    writing-mode: vertical-rl; display: flex; align-items: center; justify-content: space-between;
+    font-size: clamp(8px, calc(var(--T) * .3), 13px); letter-spacing: .08em; color: var(--sink, #2a2824);
+    white-space: nowrap; }
+  .spine .txt b { font-weight: 700; letter-spacing: .06em; }
+  .spine .txt small { font-size: .78em; opacity: .7; }
+
+  .cta { position: fixed; left: 50%; bottom: 30px; transform: translateX(-50%);
+    display: inline-flex; align-items: center; gap: 9px; padding: 13px 22px 13px 18px;
+    border: 0; border-radius: 999px; background: var(--ink); color: #fff;
+    font: 15px/1 var(--ko); white-space: nowrap; cursor: pointer; transition: transform .2s, background .2s; z-index: 5; }
+  .cta:hover { transform: translateX(-50%) translateY(-2px); background: #000; }
+  .cta svg { width: 18px; height: 18px; }
+  .credit { position: fixed; left: 20px; bottom: 22px; font: 11px/1.5 var(--sans); color: rgba(255,255,255,.78); letter-spacing: .02em; max-width: calc(50vw - 160px); }
+  .hint { position: fixed; right: 20px; bottom: 22px; font: 11px/1.5 var(--sans); color: rgba(255,255,255,.78); letter-spacing: .14em; }
+  @media (max-width: 720px) { .credit, .hint { display: none; } .cta { bottom: 22px; } }
+
+  /* camera */
+  .modal { position: fixed; inset: 0; z-index: 10; display: grid; place-items: center;
+    background: rgba(24,22,19,.74); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+  .modal[hidden] { display: none; }
+  .sheet { display: flex; flex-direction: column; align-items: center; gap: 16px; padding: 16px; max-width: 100%; }
+  .frame { position: relative; height: min(68vh, 620px); aspect-ratio: 3 / 4; max-width: calc(100vw - 32px);
+    background: #111; overflow: hidden; box-shadow: 0 30px 60px rgba(0,0,0,.35); }
+  .frame video, .frame canvas, .frame img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .frame video { transform: scaleX(-1); }
+  .frame.bw video, .frame.bw canvas.still { filter: grayscale(1) contrast(1.08); }
+  .frame .guide { position: absolute; left: 4.5%; top: 3.5%; width: 30%; aspect-ratio: 1.9 / 1; background: var(--red);
+    color: #fff; display: grid; place-items: center; font: 700 clamp(18px, 4.4vh, 40px)/1 var(--sans); letter-spacing: -.02em; pointer-events: none; }
+  .frame .count { position: absolute; inset: 0; display: grid; place-items: center; font: 700 120px/1 var(--sans); color: #fff; text-shadow: 0 4px 30px rgba(0,0,0,.4); pointer-events: none; }
+  .frame .msg { position: absolute; inset: 0; display: grid; place-items: center; padding: 28px; text-align: center;
+    font: 15px/1.6 var(--ko); color: #ddd; }
+  .row { display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap; }
+  .btn { border: 0; border-radius: 999px; padding: 11px 18px; font: 14px/1 var(--ko); cursor: pointer; background: #fff; color: var(--ink); }
+  .btn.dark { background: rgba(255,255,255,.14); color: #fff; }
+  .btn[hidden], .row[hidden] { display: none; }
+  .seg { display: inline-flex; background: rgba(255,255,255,.14); border-radius: 999px; padding: 3px; }
+  .seg button { border: 0; background: none; color: #ddd; padding: 8px 14px; border-radius: 999px; font: 13px/1 var(--ko); cursor: pointer; }
+  .seg button[aria-pressed="true"] { background: #fff; color: var(--ink); }
+  .shutter { width: 64px; height: 64px; border-radius: 50%; border: 4px solid #fff; background: rgba(255,255,255,.2); cursor: pointer; padding: 0; }
+  .shutter:hover { background: rgba(255,255,255,.4); }
+  .shutter[hidden] { display: none; }
+  .close { position: fixed; top: 18px; right: 18px; width: 40px; height: 40px; border-radius: 50%; border: 0;
+    background: rgba(255,255,255,.14); color: #fff; font-size: 22px; line-height: 1; cursor: pointer; }
+  .sub { font: 12px/1.5 var(--ko); color: #aaa; }
+  .sub button { background: none; border: 0; color: #ccc; text-decoration: underline; font: inherit; cursor: pointer; padding: 0; }
+</style>
+
+<div class="bg" id="bgA"></div><div class="bg" id="bgB"></div><div class="scrim"></div>
+<div class="stage" id="stage"><div class="track" id="track"></div></div>
+
+<button class="cta" id="cta" type="button">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.6"/></svg>
+  마지막 호 표지 촬영하기
+</button>
+<div class="credit">Inspired by The Secret Life of Walter Mitty · 표지는 모두 새로 그린 가상의 이미지</div>
+<div class="hint">SCROLL ⟷</div>
+
+<div class="modal" id="modal" hidden>
+  <button class="close" id="close" type="button" aria-label="닫기">×</button>
+  <div class="sheet">
+    <div class="frame bw" id="frame">
+      <video id="video" playsinline muted></video>
+      <canvas class="still" id="still" width="720" height="960" hidden></canvas>
+      <div class="guide">LIFE</div>
+      <div class="count" id="count"></div>
+      <div class="msg" id="msg" hidden></div>
+    </div>
+    <div class="row" id="liveRow">
+      <div class="seg" role="group" aria-label="색">
+        <button type="button" data-bw="1" aria-pressed="true">흑백</button>
+        <button type="button" data-bw="0" aria-pressed="false">컬러</button>
+      </div>
+      <button class="shutter" id="shutter" type="button" aria-label="촬영"></button>
+      <button class="btn dark" id="pick" type="button">사진 불러오기</button>
+    </div>
+    <div class="row" id="doneRow" hidden>
+      <button class="btn dark" id="retake" type="button">다시 찍기</button>
+      <button class="btn" id="apply" type="button">마지막 호 표지로 지정</button>
+    </div>
+    <div class="sub" id="sub">세로 3:4로만 찍혀요 <span id="resetWrap" hidden>· <button type="button" id="reset">원래 표지로</button></span></div>
+    <input type="file" id="file" accept="image/*" hidden>
+  </div>
+</div>
+
+<script>
+(() => {
+  const CW = 360, CH = 480;
+  const track = document.getElementById('track');
+  const stage = document.getElementById('stage');
+  const store = {
+    get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } },
+    set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch (e) { return false; } },
+    del(k) { try { localStorage.removeItem(k); } catch (e) {} },
+  };
+
+  function rng(seed) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+
+  // ---------- issues: the first January issue of each year in the Google Books LIFE archive ----------
+  const MONTHS = ['JAN.', 'FEB.', 'MARCH', 'APRIL', 'MAY', 'JUNE', 'JULY', 'AUG.', 'SEPT.', 'OCT.', 'NOV.', 'DEC.'];
+  const fmt = d => `${MONTHS[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
+  // [year, day, Google Books id, scene, caption, color?]
+  const JAN = [
+    [1937, 4, 'lUsEAAAAMBAJ', 'face', 'MAN OF THE YEAR'],
+    [1938, 3, 'jkoEAAAAMBAJ', 'skater', 'ON ICE'],
+    [1939, 2, 'J0kEAAAAMBAJ', 'veil', 'THE NEW HAT'],
+    [1940, 1, 'lz8EAAAAMBAJ', 'gown', 'DEBUTANTE'],
+    [1941, 6, 'M0oEAAAAMBAJ', 'star', 'SCREEN STAR'],
+    [1942, 5, 'G04EAAAAMBAJ', 'nurse', 'ARMY NURSE'],
+    [1943, 4, 'n04EAAAAMBAJ', 'seated', 'THE STATESMAN'],
+    [1944, 3, 'vVQEAAAAMBAJ', 'hood', 'SNOW COUNTRY'],
+    [1945, 1, 'VFMEAAAAMBAJ', 'soldier', 'INFANTRYMAN'],
+    [1946, 7, 'BEkEAAAAMBAJ', 'painter', 'THE PAINTER'],
+    [1947, 6, 'F0kEAAAAMBAJ', 'couple', 'YOUNG COUPLE'],
+    [1948, 5, '4E0EAAAAMBAJ', 'furcap', 'A NEW NATION'],
+    [1949, 3, 'h0oEAAAAMBAJ', 'baby', 'BABY OF THE YEAR'],
+    [1950, 2, 'TUAEAAAAMBAJ', 'boater', 'MID-CENTURY', 0, 'SPECIAL ISSUE'],
+    [1951, 1, 'FkwEAAAAMBAJ', 'glasses', 'THE INDUSTRIALIST'],
+    [1952, 7, 'bVQEAAAAMBAJ', 'profiles', 'NEW STYLES'],
+    [1953, 5, 'QUIEAAAAMBAJ', 'family', 'THE AMERICAN FAMILY', 0, 'SPECIAL ISSUE'],
+    [1954, 4, 'i0gEAAAAMBAJ', 'rocket', 'THE ROCKET AGE', 0, 'SPECIAL ISSUE'],
+    [1955, 3, '_VMEAAAAMBAJ', 'cart', 'FOOD', 1],
+    [1956, 9, 'ez8EAAAAMBAJ', 'sitting', 'IN BLUE', 1],
+    [1957, 7, '8lYEAAAAMBAJ', 'crowd', 'ON THE TRAIL', 1],
+    [1958, 6, 'TlYEAAAAMBAJ', 'astronaut', 'BEYOND EARTH', 1],
+    [1959, 5, 'Gj8EAAAAMBAJ', 'students', 'THE STUDENTS', 1],
+    [1960, 11, 'dlUEAAAAMBAJ', 'lookup', 'LOOKING UP', 1],
+    [1961, 6, 'yEUEAAAAMBAJ', 'battle', 'A NATION DIVIDED', 1],
+    [1962, 5, 'nE0EAAAAMBAJ', 'redheads', 'TWO OF A KIND', 1],
+    [1963, 4, '3UcEAAAAMBAJ', 'statue', 'The Glory of Greece', 1],
+    [1964, 3, 'TlQEAAAAMBAJ', 'ship', 'FIRE AT SEA', 1],
+    [1965, 8, 'yEgEAAAAMBAJ', 'flood', 'THE GREAT FLOOD', 1],
+    [1966, 7, 'CkwEAAAAMBAJ', 'diver', 'MAN IN BLACK', 1],
+    [1967, 6, 'i1YEAAAAMBAJ', 'cat', 'THE GREAT CATS', 1],
+    [1968, 5, 'cUoEAAAAMBAJ', 'floor', 'ON HER OWN', 1],
+    [1969, 10, 'qFIEAAAAMBAJ', 'earth', 'THE VIEW FROM SPACE', 1],
+    [1970, 9, 'j1AEAAAAMBAJ', 'burst', 'INTO A NEW DECADE', 1],
+    [1971, 8, 'nFMEAAAAMBAJ', 'cubes', 'The New America', 1],
+    [1972, 14, 'CUAEAAAAMBAJ', 'helmet', 'THE BIG GAME', 1],
+  ];
+  const price = y => y < 1947 ? '10 CENTS' : y < 1950 ? '15 CENTS' : y < 1958 ? '20 CENTS' : y < 1966 ? '25 CENTS' : y < 1970 ? '35 CENTS' : '50 CENTS';
+  const INKS = ['#8e2b27'];
+  const SPINES = ['#f1ece1', '#f4f1ea', '#ebe4d4', '#e2dac8', '#f6f4ef', '#e9e3d6'];
+  const ISSUES = [];
+  (() => {
+    const r = rng(1937);
+    JAN.forEach(([y, d, gid, scene, head, color, special], i) => {
+      ISSUES.push({
+        id: i, gid, scene, head, special, color: !!color, year: y,
+        date: fmt(new Date(y, 0, d)), price: price(y),
+        thick: .06 + r() * .045, hf: .97 + r() * .03,
+        spine: SPINES[Math.floor(r() * SPINES.length)], seed: Math.floor(r() * 1e9),
+      });
+    });
+    ISSUES.push({ id: ISSUES.length, last: true, date: 'THE LAST ISSUE', head: 'THE LAST ISSUE', price: '', thick: .1, hf: 1, spine: '#f7f5f0', seed: 25 });
+  })();
+  const LAST = ISSUES[ISSUES.length - 1];
+
+  // ---------- cover drawing ----------
+  const gray = (v, a = 1) => { const c = Math.round(14 + v * 228); return `rgba(${c},${c},${c},${a})`; };
+  let X; // current context
+  function bg(top, bot, y0 = 0, y1 = CH) { const g = X.createLinearGradient(0, y0, 0, y1); g.addColorStop(0, top); g.addColorStop(1, bot); X.fillStyle = g; X.fillRect(0, 0, CW, CH); }
+  function ell(x, y, rx, ry, f, rot = 0) { X.fillStyle = f; X.beginPath(); X.ellipse(x, y, rx, ry, rot, 0, 7); X.fill(); }
+  function poly(pts, f) { X.fillStyle = f; X.beginPath(); pts.forEach((p, i) => i ? X.lineTo(p[0], p[1]) : X.moveTo(p[0], p[1])); X.closePath(); X.fill(); }
+  function rect(x, y, w, h, f) { X.fillStyle = f; X.fillRect(x, y, w, h); }
+  function line(pts, w, s) { X.strokeStyle = s; X.lineWidth = w; X.lineCap = 'round'; X.lineJoin = 'round'; X.beginPath(); pts.forEach((p, i) => i ? X.lineTo(p[0], p[1]) : X.moveTo(p[0], p[1])); X.stroke(); }
+  function glow(x, y, R, col) { const g = X.createRadialGradient(x, y, 0, x, y, R); g.addColorStop(0, col); g.addColorStop(1, 'rgba(255,255,255,0)'); X.fillStyle = g; X.fillRect(x - R, y - R, R * 2, R * 2); }
+  function shade(x, y, R, a = .5) { const g = X.createRadialGradient(x, y, 0, x, y, R); g.addColorStop(0, `rgba(0,0,0,${a})`); g.addColorStop(1, 'rgba(0,0,0,0)'); X.fillStyle = g; X.fillRect(x - R, y - R, R * 2, R * 2); }
+  // head + neck + shoulders, lit from the left
+  function bust(x, y, s, skin, cloth, spread = 2.3) {
+    X.fillStyle = cloth; X.beginPath();
+    X.moveTo(x - s * .34, y + s * .78); X.lineTo(x + s * .34, y + s * .78);
+    X.quadraticCurveTo(x + s * .4, y + s * 1.25, x + s * spread * .5, y + s * 1.4);
+    X.quadraticCurveTo(x + s * spread, y + s * 1.55, x + s * spread * 1.05, CH + 20);
+    X.lineTo(x - s * spread * 1.05, CH + 20);
+    X.quadraticCurveTo(x - s * spread, y + s * 1.55, x - s * spread * .5, y + s * 1.4);
+    X.quadraticCurveTo(x - s * .4, y + s * 1.25, x - s * .34, y + s * .78); X.fill();
+    rect(x - s * .3, y + s * .5, s * .6, s * .5, skin);
+    shade(x + s * .1, y + s * .95, s * .5, .35);
+    ell(x, y, s * .74, s, skin);
+    glow(x - s * .3, y - s * .25, s * .8, 'rgba(255,255,255,.28)');
+    shade(x + s * .55, y + s * .2, s * .7, .3);
+  }
+  function hair(x, y, s, col, vol = 1) { ell(x, y - s * .45, s * .82 * vol, s * .62 * vol, col); }
+  function crowdHeads(r, n, y0, y1, skins, cloths) {
+    for (let i = 0; i < n; i++) { const t = i / n, y = y0 + (y1 - y0) * t, x = r() * CW, s = 14 + t * 30;
+      rect(x - s, y + s * .7, s * 2, CH, cloths[Math.floor(r() * cloths.length)]);
+      ell(x, y, s * .74, s, skins[Math.floor(r() * skins.length)]); ell(x, y - s * .5, s * .76, s * .55, gray(.08, .9)); }
+  }
+
+  const SCENE = {
+    face(r) { bg(gray(.6), gray(.4)); ell(200, 470, 230, 90, gray(.15)); ell(190, 250, 150, 205, gray(.42)); ell(338, 260, 22, 48, gray(.36));
+      glow(140, 210, 160, 'rgba(255,255,255,.35)'); shade(290, 300, 160, .45); ell(185, 80, 140, 70, gray(.55)); line([[120, 215], [170, 205]], 6, gray(.22)); line([[215, 205], [265, 212]], 6, gray(.22)); },
+    skater(r) { bg(gray(.55), gray(.75), 0, 300); rect(0, 330, CW, 150, gray(.9)); line([[0, 330], [CW, 330]], 3, gray(.3));
+      const w = gray(.95); line([[150, 175], [205, 240]], 20, w); line([[205, 240], [300, 150]], 13, w); line([[205, 240], [180, 330]], 13, w); line([[160, 180], [90, 130]], 8, w); line([[160, 180], [250, 160]], 8, w); ell(140, 158, 16, 19, gray(.7)); ell(136, 145, 17, 10, gray(.15)); ell(210, 240, 26, 14, w, .4); },
+    veil(r) { bg(gray(.72), gray(.5)); bust(185, 220, 70, gray(.72), gray(.18)); ell(185, 150, 150, 34, gray(.08), -.08); ell(190, 120, 70, 45, gray(.1));
+      X.strokeStyle = gray(.15, .45); X.lineWidth = 1; for (let i = -40; i < 400; i += 10) { line([[i, 160], [i + 120, 470]], 1, gray(.15, .45)); line([[i + 120, 160], [i, 470]], 1, gray(.15, .45)); } },
+    gown(r) { bg(gray(.5), gray(.62)); rect(40, 40, 90, 150, gray(.7)); rect(240, 40, 90, 150, gray(.7)); rect(0, 380, CW, 100, gray(.4));
+      poly([[180, 200], [70, 450], [300, 450]], gray(.93)); glow(150, 330, 110, 'rgba(255,255,255,.4)'); poly([[160, 150], [200, 150], [205, 215], [155, 215]], gray(.9)); ell(180, 128, 15, 19, gray(.7)); ell(178, 116, 17, 12, gray(.12)); },
+    star(r) { bg(gray(.08), gray(.22)); hair(175, 210, 100, gray(.05), 1.5); bust(180, 220, 90, gray(.78), gray(.12), 2); ell(110, 260, 50, 120, gray(.05), .2); },
+    nurse(r) { bg(gray(.55), gray(.65)); for (let y = 60; y < 300; y += 60) { rect(0, y + 40, CW, 4, gray(.35)); for (let x = 10; x < CW; x += 28) rect(x, y + 10 + r() * 10, 16, 30 - r() * 10, gray(.75 + r() * .2, .8)); }
+      bust(180, 210, 72, gray(.75), gray(.93), 2.2); hair(180, 210, 72, gray(.2)); poly([[115, 150], [245, 150], [225, 105], [135, 105]], gray(.96)); },
+    seated(r) { bg(gray(.35), gray(.25)); rect(220, 40, 120, 150, gray(.45)); rect(40, 300, 280, 180, gray(.1)); bust(170, 200, 60, gray(.7), gray(.16), 2.6); poly([[160, 290], [180, 290], [170, 360]], gray(.9)); ell(170, 160, 46, 30, gray(.55)); },
+    hood(r) { bg(gray(.82), gray(.95)); line([[250, 20], [320, 300]], 9, gray(.15)); line([[285, 10], [345, 290]], 9, gray(.15)); ell(180, 230, 120, 140, gray(.94));
+      for (let i = 0; i < 160; i++) { const a = r() * 7, d = 95 + r() * 30; line([[180 + Math.cos(a) * d, 230 + Math.sin(a) * d * 1.15], [180 + Math.cos(a) * (d + 10), 230 + Math.sin(a) * (d + 10) * 1.15]], 2, gray(.7, .5)); }
+      ell(180, 240, 58, 74, gray(.68)); glow(160, 220, 60, 'rgba(255,255,255,.3)'); rect(60, 380, 240, 100, gray(.9)); },
+    soldier(r) { bg(gray(.45), gray(.3)); for (let i = 0; i < 26; i++) ell(40 + r() * 280, 120 + r() * 340, 20 + r() * 50, 15 + r() * 40, gray(.15 + r() * .45), r() * 3);
+      ell(230, 110, 70, 50, gray(.25)); rect(160, 110, 140, 14, gray(.2)); ell(225, 150, 32, 30, gray(.55)); line([[60, 460], [300, 180]], 10, gray(.1)); },
+    painter(r) { bg(gray(.4), gray(.5)); rect(170, 90, 160, 210, gray(.15)); rect(180, 100, 140, 190, gray(.7)); for (let i = 0; i < 9; i++) ell(190 + r() * 120, 120 + r() * 150, 10 + r() * 22, 8 + r() * 18, gray(.3 + r() * .5));
+      line([[200, 300], [190, 470]], 6, gray(.1)); line([[300, 300], [320, 470]], 6, gray(.1)); poly([[70, 220], [150, 220], [160, 470], [55, 470]], gray(.12)); ell(110, 190, 26, 32, gray(.65)); rect(80, 150, 60, 20, gray(.08)); line([[145, 250], [200, 210]], 6, gray(.12)); },
+    couple(r) { bg(gray(.25), gray(.35)); bust(250, 160, 52, gray(.65), gray(.1), 2); rect(200, 95, 100, 22, gray(.06)); ell(250, 100, 60, 14, gray(.08));
+      bust(140, 250, 62, gray(.82), gray(.92), 2); hair(140, 250, 62, gray(.75)); glow(130, 330, 120, 'rgba(255,255,255,.25)'); },
+    furcap(r) { bg(gray(.72), gray(.62)); bust(185, 250, 78, gray(.5), gray(.25), 2.2); poly([[105, 200], [265, 200], [250, 60], [120, 60]], gray(.1));
+      for (let i = 0; i < 260; i++) { const x = 115 + r() * 145, y = 60 + r() * 140; line([[x, y], [x + (r() - .5) * 8, y - 10]], 2, gray(.2 + r() * .2, .7)); } },
+    baby(r) { bg(gray(.9), gray(.72)); rect(60, 330, 240, 150, gray(.9)); for (let y = 340; y < 480; y += 9) line([[60, y], [300, y]], 2, gray(.7, .6)); line([[80, 360], [50, 300]], 30, gray(.88)); line([[280, 360], [310, 300]], 30, gray(.88));
+      ell(180, 220, 105, 115, gray(.8)); glow(150, 190, 110, 'rgba(255,255,255,.35)'); ell(180, 290, 30, 14, gray(.45)); },
+    boater(r) { bg(gray(.6), gray(.45)); bust(170, 235, 62, gray(.8), gray(.15), 2); poly([[145, 310], [195, 310], [170, 360]], gray(.95)); hair(170, 235, 62, gray(.12)); ell(170, 175, 125, 22, gray(.94)); rect(120, 140, 100, 38, gray(.94)); rect(120, 165, 100, 10, gray(.12)); },
+    glasses(r) { bg(gray(.85), gray(.7)); bust(170, 200, 92, gray(.62), gray(.18), 2.3); hair(170, 200, 92, gray(.3), .95); X.strokeStyle = gray(.08); X.lineWidth = 5; X.beginPath(); X.arc(135, 200, 28, 0, 7); X.moveTo(233, 200); X.arc(205, 200, 28, 0, 7); X.stroke(); line([[163, 198], [177, 198]], 5, gray(.08)); poly([[150, 330], [190, 330], [170, 420]], gray(.92)); },
+    profiles(r) { bg(gray(.92), gray(.82)); ell(250, 180, 80, 100, gray(.7)); hair(250, 180, 100, gray(.06), .9); rect(200, 260, 110, 220, gray(.12)); ell(140, 280, 62, 78, gray(.75)); hair(140, 280, 70, gray(.55), .9); rect(90, 345, 100, 140, gray(.85)); },
+    family(r) { bg(gray(.5), gray(.4)); rect(30, 120, 300, 260, gray(.15)); rect(45, 135, 270, 230, gray(.6)); [[100, 240, 40], [180, 220, 46], [260, 250, 36], [220, 160, 24]].forEach(([x, y, s]) => bust(x, y, s, gray(.8), gray(.85 - s / 200), 1.5)); rect(30, 380, 300, 100, gray(.25)); },
+    rocket(r) { bg(gray(.62), gray(.85)); for (let i = 0; i < 40; i++) ell(100 + r() * 140 - i * 2, 330 + r() * 80 + i * 2, 30 + r() * 30, 22 + r() * 20, gray(.85 + r() * .12, .8)); rect(0, 420, CW, 60, gray(.2));
+      X.save(); X.translate(220, 200); X.rotate(.55); rect(-10, -110, 20, 200, gray(.95)); poly([[-10, -110], [10, -110], [0, -150]], gray(.9)); poly([[-10, 60], [-28, 95], [-10, 90]], gray(.6)); poly([[10, 60], [28, 95], [10, 90]], gray(.6)); X.restore(); },
+    cart(r) { bg('#f3eee4', '#e7dfd0'); X.strokeStyle = '#777'; X.lineWidth = 2; for (let x = 80; x <= 320; x += 14) line([[x, 250], [x - 20, 420]], 2, '#8a8a8a'); for (let y = 250; y <= 420; y += 14) line([[80 - (y - 250) * .12, y], [320 - (y - 250) * .12, y]], 2, '#8a8a8a');
+      const cs = ['#d33a2c', '#f2b632', '#3d8b3d', '#e57a2e', '#fff6d8', '#a33']; for (let i = 0; i < 30; i++) ell(90 + r() * 220, 240 + r() * 120, 14 + r() * 20, 12 + r() * 16, cs[Math.floor(r() * cs.length)]);
+      ell(260, 440, 14, 14, '#333'); ell(80, 440, 14, 14, '#333'); bust(140, 160, 34, '#f1c9a5', '#c8302a', 1.6); ell(140, 140, 34, 26, '#c8302a'); line([[170, 200], [250, 110]], 10, '#c8302a'); },
+    sitting(r) { bg('#1f4aa0', '#163a80'); rect(150, 360, 60, 120, '#0e2a5e'); poly([[150, 230], [230, 230], [250, 360], [130, 360]], '#2b5fc4'); line([[140, 355], [90, 420], [60, 470]], 14, '#f0c8a4'); line([[240, 355], [210, 420], [200, 470]], 14, '#f0c8a4');
+      ell(190, 200, 26, 32, '#f2cba6'); hair(190, 200, 30, '#8a3f1e', 1.1); poly([[150, 230], [230, 230], [215, 255], [165, 255]], '#2b5fc4'); },
+    crowd(r) { bg('#3a3026', '#5a4a38'); crowdHeads(r, 26, 120, 420, ['#e8b894', '#d8a07a', '#f0c8a4'], ['#2f3b52', '#6b4a3a', '#d8d0c0', '#3a5a7a']); bust(170, 200, 50, '#e0a982', '#262c3a', 2); hair(170, 200, 50, '#1a1a1a', .9); ell(240, 330, 50, 40, '#d9d2b8'); },
+    astronaut(r) { bg('#3b2a1f', '#6b4a2c'); for (let i = 0; i < 12; i++) { const x = r() * CW; line([[x, 0], [x + (r() - .5) * 80, CH]], 8 + r() * 14, `rgba(${150 + r() * 80},${110 + r() * 60},60,.5)`); }
+      poly([[140, 200], [220, 200], [240, 470], [120, 470]], '#cfd2d6'); glow(160, 280, 90, 'rgba(255,255,255,.5)'); line([[140, 220], [100, 360]], 22, '#c4c7cb'); line([[220, 220], [260, 360]], 22, '#c4c7cb'); ell(180, 160, 48, 52, '#d9dce0'); ell(180, 165, 34, 30, '#2b2f3a'); glow(168, 150, 20, 'rgba(255,255,255,.7)'); },
+    students(r) { bg('#c7c1b2', '#9b958a'); crowdHeads(r, 34, 90, 430, ['#e2b48c', '#cf9f78', '#e8c09a'], ['#3e5b8c', '#2f4a76', '#e9e6df', '#5a6f8f']); },
+    lookup(r) { bg('#0f1f24', '#1b3138'); for (let i = 0; i < 40; i++) ell(r() * 160, r() * CH, 8, 8, `rgba(200,220,210,${r() * .2})`); bust(230, 230, 70, '#f1d3b8', '#151515', 2); ell(245, 200, 74, 62, '#f2cf72', -.5); glow(200, 200, 120, 'rgba(255,240,200,.25)'); rect(160, 330, 160, 150, '#2a2a2a'); },
+    battle(r) { bg('#c98b52', '#6b4a2c'); for (let i = 0; i < 30; i++) ell(r() * CW, 100 + r() * 160, 30 + r() * 50, 20 + r() * 30, `rgba(${200 + r() * 40},${180 + r() * 40},${150 + r() * 40},.45)`);
+      for (let i = 0; i < 7; i++) { const x = 30 + r() * 300, y = 260 + r() * 180, s = 22 + r() * 20, f = ['#3a2a1e', '#5a3a26', '#2a1e16'][i % 3]; ell(x, y, s * 1.4, s * .7, f); line([[x - s, y], [x - s * 1.2, y + s * 1.4]], 5, f); line([[x + s, y], [x + s * 1.3, y + s * 1.3]], 5, f); line([[x + s, y - s * .2], [x + s * 1.8, y - s]], s * .45, f); line([[x, y - s * .4], [x - s * .2, y - s * 1.5]], 7, f); }
+      rect(0, 440, CW, 40, '#4a3420'); },
+    redheads(r) { bg('#f0e6d6', '#d9c7ae'); bust(250, 160, 58, '#f2d0b5', '#2f5e8f', 1.8); hair(250, 160, 70, '#d2561e', 1.3); bust(150, 280, 64, '#f4d6bd', '#e7e2d6', 2); hair(150, 280, 78, '#c94a17', 1.3); },
+    statue(r) { bg('#c9b8a0', '#8f7f6a'); poly([[110, 160], [250, 160], [270, 470], [90, 470]], '#e9e4da'); glow(150, 260, 140, 'rgba(255,255,255,.45)'); shade(250, 320, 120, .25); ell(185, 130, 34, 42, '#ece7de'); ell(185, 105, 36, 24, '#d8d0c2'); ell(140, 250, 26, 24, '#f2eee6'); ell(220, 250, 26, 24, '#e5dfd3'); },
+    ship(r) { bg('#8ea3b0', '#d5dde2', 0, 300); for (let i = 0; i < 50; i++) ell(150 + r() * 120 - i * 3, 230 - i * 4 + r() * 20, 30 + i * .8, 22 + i * .6, `rgba(${235 + r() * 20},${235 + r() * 20},${235 + r() * 20},.6)`);
+      rect(0, 320, CW, 160, '#3c5566'); for (let i = 0; i < 60; i++) rect(r() * CW, 320 + r() * 160, 20 + r() * 50, 2, 'rgba(255,255,255,.25)'); poly([[60, 300], [320, 300], [300, 335], [80, 335]], '#2a2a2a'); rect(130, 260, 150, 40, '#e8e4dc'); rect(180, 225, 40, 35, '#1f1f1f'); },
+    flood(r) { bg('#2f4a26', '#5a7a3a'); for (let i = 0; i < 220; i++) ell(r() * CW, r() * CH, 8 + r() * 18, 8 + r() * 14, `rgba(${40 + r() * 60},${90 + r() * 70},${40 + r() * 40},.7)`);
+      X.fillStyle = '#8a6e4a'; X.beginPath(); X.moveTo(0, 300); X.bezierCurveTo(120, 260, 200, 380, CW, 330); X.lineTo(CW, 400); X.bezierCurveTo(200, 440, 120, 320, 0, 370); X.fill(); rect(160, 200, 40, 30, '#f4f1ea'); poly([[155, 200], [205, 200], [180, 182]], '#5a3a2a'); },
+    diver(r) { bg('#b8b3aa', '#8f8a82'); bust(190, 150, 46, '#d8a982', '#121212', 3); hair(190, 150, 46, '#1a1410'); poly([[170, 240], [210, 240], [195, 330]], '#c99a76'); line([[110, 260], [80, 420]], 34, '#121212'); line([[270, 260], [300, 420]], 34, '#121212'); },
+    cat(r) { bg('#050505', '#0b0b0b'); glow(130, 190, 26, 'rgba(240,210,80,.9)'); glow(230, 190, 26, 'rgba(240,210,80,.9)'); ell(130, 190, 4, 10, '#111'); ell(230, 190, 4, 10, '#111');
+      ell(180, 330, 70, 60, '#4a1c18'); [[130, 290], [160, 285], [200, 285], [230, 290]].forEach(([x, y]) => poly([[x - 8, y], [x + 8, y], [x, y + 26]], '#f2ece0')); [[140, 380], [220, 380]].forEach(([x, y]) => poly([[x - 7, y], [x + 7, y], [x, y - 22]], '#f2ece0')); },
+    floor(r) { bg('#ecc52c', '#e3b81f'); ell(180, 430, 90, 16, 'rgba(0,0,0,.15)'); poly([[110, 410], [250, 410], [230, 380], [130, 380]], '#2a2a2a'); poly([[140, 300], [220, 300], [225, 390], [135, 390]], '#1b1b1b'); ell(180, 275, 24, 28, '#f0c9a4'); hair(180, 275, 26, '#d7b25a'); line([[145, 320], [120, 390]], 12, '#1b1b1b'); line([[215, 320], [240, 390]], 12, '#1b1b1b'); },
+    earth(r) { bg('#020306', '#05070c'); for (let i = 0; i < 80; i++) rect(r() * CW, r() * CH, 1.2, 1.2, `rgba(255,255,255,${r() * .6})`); const g = X.createRadialGradient(150, 260, 20, 180, 300, 160); g.addColorStop(0, '#5a8fd0'); g.addColorStop(1, '#0e2a5a'); ell(180, 300, 150, 150, g);
+      for (let i = 0; i < 26; i++) { const a = r() * 7, d = r() * 120; ell(180 + Math.cos(a) * d, 300 + Math.sin(a) * d, 18 + r() * 30, 6 + r() * 10, 'rgba(255,255,255,.55)', a); } ell(140, 330, 40, 30, 'rgba(160,120,70,.6)'); shade(260, 360, 140, .6); },
+    burst(r) { bg('#080606', '#120c08'); for (let i = 0; i < 90; i++) { const a = r() * 7, d = 40 + r() * 80; line([[180, 260], [180 + Math.cos(a) * d, 260 + Math.sin(a) * d]], 3 + r() * 4, `rgba(${220 + r() * 35},${150 + r() * 80},${40 + r() * 40},.55)`); } glow(180, 260, 70, 'rgba(255,230,160,.9)'); ell(180, 260, 22, 22, '#2a1a10'); },
+    cubes(r) { bg('#f7f5f0', '#ecebe6'); const cs = ['#c8302a', '#f7f5f0', '#24407a']; for (let row = 0; row < 6; row++) { const x = 70 + (row % 2) * 30, y = 420 - row * 52;
+      poly([[x, y], [x + 70, y - 20], [x + 140, y], [x + 70, y + 20]], cs[row % 3]); poly([[x, y], [x + 70, y + 20], [x + 70, y + 70], [x, y + 50]], '#b9b4aa'); poly([[x + 140, y], [x + 70, y + 20], [x + 70, y + 70], [x + 140, y + 50]], cs[(row + 1) % 3]); } },
+    helmet(r) { bg('#f4f2ee', '#e2ded6'); ell(190, 270, 120, 110, '#1f2a4a'); glow(150, 220, 60, 'rgba(255,255,255,.35)'); rect(190, 230, 60, 12, '#e8e6e0');
+      [[250, 290], [250, 320]].forEach(([x, y]) => line([[x - 120, y], [x + 50, y]], 7, '#d9d6cf')); line([[240, 270], [240, 350]], 7, '#d9d6cf'); ell(130, 300, 40, 50, '#d9a982'); },
+  };
+
+  function grain(ctx, r, amt) {
+    const img = ctx.getImageData(0, 0, CW, CH), d = img.data;
+    for (let i = 0; i < d.length; i += 4) { const n = (r() - .5) * amt; d[i] += n; d[i + 1] += n; d[i + 2] += n; }
+    ctx.putImageData(img, 0, 0);
+    const v = ctx.createRadialGradient(CW / 2, CH / 2, CH * .3, CW / 2, CH / 2, CH * .78);
+    v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(0,0,0,.28)');
+    ctx.fillStyle = v; ctx.fillRect(0, 0, CW, CH);
+  }
+
+  function masthead(ctx, issue) {
+    const x = 0, y = 0, w = 132, h = 62;
+    ctx.fillStyle = '#d7262c'; ctx.fillRect(x, y, w, h);
+    ctx.fillStyle = '#fff'; ctx.font = '700 52px Jost'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('LIFE', x + w / 2, y + h / 2 + 3);
+    ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+  }
+  // red band with date and price along the bottom (1937–1959), small date line later
+  function footer(ctx, issue) {
+    if (issue.year && issue.year < 1960) {
+      ctx.fillStyle = '#d7262c'; ctx.fillRect(0, CH - 34, CW, 34);
+      ctx.fillStyle = '#fff'; ctx.textAlign = 'right';
+      ctx.font = '500 11px Jost'; ctx.fillText(issue.date.replace(/^JAN\./, 'JANUARY'), CW - 74, CH - 13);
+      ctx.font = '700 15px Jost'; ctx.fillText(issue.price.replace(' CENTS', ''), CW - 44, CH - 12);
+      ctx.font = '500 8px Jost'; ctx.fillText('CENTS', CW - 12, CH - 13);
+      ctx.textAlign = 'left'; ctx.font = '500 9px Jost'; ctx.fillStyle = 'rgba(255,255,255,.92)';
+      ctx.fillText(issue.head, 12, CH - 42);
+    } else {
+      ctx.font = '500 9px Jost'; ctx.fillStyle = 'rgba(255,255,255,.85)'; ctx.textAlign = 'right';
+      ctx.fillText(`${issue.date.replace(/^JAN\./, 'JANUARY')}  ·  ${issue.price}`, CW - 12, CH - 12); ctx.textAlign = 'left';
+    }
+  }
+  function cornerHead(ctx, issue) {
+    if (!issue.year || issue.year < 1960) return;
+    const serif = /[a-z]/.test(issue.head);
+    const light = ['cubes', 'helmet', 'redheads', 'floor'].includes(issue.scene);
+    ctx.fillStyle = light ? (issue.scene === 'helmet' ? '#d7262c' : '#1c1b19') : '#fff';
+    ctx.font = serif ? 'italic 500 26px Georgia, serif' : '700 20px Jost';
+    const words = issue.head.split(' '); const lines = []; let cur = '';
+    words.forEach(w => { const t = cur ? cur + ' ' + w : w; if (ctx.measureText(t).width > 200) { lines.push(cur); cur = w; } else cur = t; });
+    lines.push(cur);
+    lines.forEach((l, i) => ctx.fillText(l, 146, 28 + i * (serif ? 28 : 22)));
+  }
+  function specialBanner(ctx, text) {
+    ctx.save(); ctx.translate(CW - 52, 54); ctx.rotate(Math.PI / 4);
+    ctx.fillStyle = '#f2c230'; ctx.fillRect(-90, -16, 180, 32);
+    ctx.fillStyle = '#1c1b19'; ctx.font = '700 13px Jost'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(text, 0, 1); ctx.restore(); ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+  }
+
+  function drawIssue(cv, issue) {
+    const ctx = cv.getContext('2d'); X = ctx;
+    const r = rng(issue.seed);
+    ctx.save(); ctx.clearRect(0, 0, CW, CH);
+    SCENE[issue.scene](r);
+    ctx.restore();
+    grain(ctx, r, issue.color ? 16 : 30);
+    masthead(ctx, issue);
+    cornerHead(ctx, issue);
+    if (issue.special) specialBanner(ctx, issue.special);
+    footer(ctx, issue);
+  }
+
+  let custom = store.get('life-last-cover');
+  let customImg = null;
+
+  function drawLast(cv) {
+    const ctx = cv.getContext('2d');
+    ctx.clearRect(0, 0, CW, CH);
+    if (customImg) {
+      const s = Math.max(CW / customImg.width, CH / customImg.height);
+      const w = customImg.width * s, h = customImg.height * s;
+      ctx.filter = custom.bw ? 'grayscale(1) contrast(1.08)' : 'none';
+      ctx.drawImage(customImg, (CW - w) / 2, (CH - h) / 2, w, h);
+      ctx.filter = 'none';
+      const g = ctx.createLinearGradient(0, CH * .7, 0, CH); g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,.35)');
+      ctx.fillStyle = g; ctx.fillRect(0, 0, CW, CH);
+      masthead(ctx); footer(ctx, { date: custom.date, price: 'FINAL ISSUE' });
+    } else {
+      ctx.fillStyle = '#1b1a18'; ctx.fillRect(0, 0, CW, CH);
+      ctx.strokeStyle = 'rgba(232,150,60,.55)'; ctx.lineWidth = 1;
+      ctx.strokeRect(36, 110, CW - 72, CH - 200);
+      ctx.fillStyle = 'rgba(232,150,60,.75)'; ctx.font = '500 11px Jost';
+      for (let y = 118; y < CH - 96; y += 22) { ctx.fillRect(18, y, 9, 12); ctx.fillRect(CW - 27, y, 9, 12); }
+      ctx.textAlign = 'center';
+      ctx.font = '700 64px Jost'; ctx.fillText('25', CW / 2, CH / 2 + 30);
+      ctx.font = '500 11px Jost'; ctx.fillStyle = 'rgba(255,255,255,.6)';
+      ctx.fillText('THE QUINTESSENCE OF LIFE', CW / 2, CH / 2 + 62);
+      ctx.textAlign = 'left';
+      masthead(ctx);
+    }
+  }
+
+  // ---------- build shelf ----------
+  const books = [];
+  ISSUES.forEach(issue => {
+    const el = document.createElement('div');
+    el.className = 'book';
+    el.dataset.i = issue.id;
+    el.style.setProperty('--sp', issue.spine);
+    if (INKS.includes(issue.spine)) el.style.setProperty('--sink', '#f3efe6');
+    const spineTxt = issue.last
+      ? `<b>THE LAST ISSUE</b><small>NEGATIVE NO. 25</small>`
+      : `<b>${issue.head}</b><small>${issue.date}</small>`;
+    el.innerHTML = `<div class="shadow"></div><div class="lifter"><div class="box">
+      <div class="face back"></div>
+      <div class="face cover"><canvas width="${CW}" height="${CH}"></canvas>${issue.gid ? `<a class="go" href="https://books.google.com/books?id=${issue.gid}&printsec=frontcover" target="_blank" rel="noopener" aria-label="구글 북스에서 ${issue.date} 호 보기"></a>` : ''}</div>
+      <div class="face spine"><div class="logo">LIFE</div><div class="txt">${spineTxt}</div></div>
+    </div></div>`;
+    el.setAttribute('aria-label', `LIFE ${issue.date} ${issue.last ? '' : issue.head}`);
+    track.appendChild(el);
+    books.push({ el, issue, cv: el.querySelector('canvas') });
+  });
+
+  function layout() {
+    const H = Math.max(240, Math.min(innerHeight * .56, 560, innerWidth * 1.05));
+    books.forEach(b => {
+      const h = Math.round(H * b.issue.hf);
+      const T = Math.max(16, Math.round(H * b.issue.thick));
+      b.el.style.setProperty('--h', h + 'px');
+      b.el.style.setProperty('--T', T + 'px');
+      b.el.style.setProperty('--W', Math.round(h * .75) + 'px');
+    });
+    track.style.bottom = Math.max(90, innerHeight * .21) + 'px';
+  }
+  layout();
+
+  function paintAll() {
+    books.forEach(b => b.issue.last ? drawLast(b.cv) : drawIssue(b.cv, b.issue));
+  }
+  function loadCustom() {
+    return new Promise(res => {
+      if (!custom || !custom.img) { customImg = null; return res(); }
+      const im = new Image(); im.onload = () => { customImg = im; res(); }; im.onerror = () => { customImg = null; res(); }; im.src = custom.img;
+    });
+  }
+  Promise.all([
+    document.fonts ? document.fonts.load('700 50px Jost').catch(() => {}) : 0,
+    document.fonts ? document.fonts.load('500 11px Jost').catch(() => {}) : 0,
+    loadCustom(),
+  ]).then(paintAll);
+  paintAll();
+
+  // ---------- scroll + hover ----------
+  let x = 0, tx = 0, mx = -1, my = -1, hovered = null, dwell = 0, forced = null, dirty = true;
+  const maxX = () => Math.max(0, track.scrollWidth - innerWidth);
+  const clampT = () => { tx = Math.max(0, Math.min(maxX(), tx)); };
+
+  stage.addEventListener('wheel', e => {
+    e.preventDefault();
+    const k = e.deltaMode === 1 ? 16 : (e.deltaMode === 2 ? innerWidth : 1);
+    tx += (Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY) * k;
+    clampT();
+  }, { passive: false });
+
+  addEventListener('keydown', e => {
+    if (!document.getElementById('modal').hidden) { if (e.key === 'Escape') closeCam(); return; }
+    if (e.key === 'ArrowRight') { tx += 220; clampT(); }
+    if (e.key === 'ArrowLeft') { tx -= 220; clampT(); }
+  });
+
+  let drag = null;
+  stage.addEventListener('pointerdown', e => { drag = { x: e.clientX, tx, moved: false, id: e.pointerId }; });
+  addEventListener('pointermove', e => {
+    mx = e.clientX; my = e.clientY; dirty = true;
+    if (drag && e.pointerType !== 'mouse') { const dx = e.clientX - drag.x; if (Math.abs(dx) > 6) drag.moved = true; tx = drag.tx - dx; clampT(); }
+  });
+  let dragMoved = false;
+  addEventListener('pointerup', () => { dragMoved = !!(drag && drag.moved); drag = null; });
+  document.addEventListener('pointerleave', () => { mx = my = -1; dirty = true; });
+
+  stage.addEventListener('click', e => {
+    if (dragMoved) { dragMoved = false; return; }
+    const bk = e.target.closest && e.target.closest('.book'); if (!bk) return;
+    const b = books[+bk.dataset.i];
+    if (!b.el.classList.contains('open')) { e.preventDefault(); setHover(b); b.el.classList.add('open'); return; }
+    if (b.issue.last) openCam();
+  });
+
+  function setHover(b) {
+    if (b === hovered) return;
+    if (hovered) hovered.el.classList.remove('lift', 'open');
+    hovered = b;
+    clearTimeout(dwell);
+    if (forced && forced !== b) { forced.el.classList.remove('lift', 'open'); forced = null; }
+    if (b) {
+      b.el.classList.add('lift');
+      dwell = setTimeout(() => b.el.classList.add('open'), 150);
+    }
+  }
+
+  function hit() {
+    if (mx < 0) return setHover(null);
+    const el = document.elementFromPoint(mx, my);
+    const bk = el && el.closest && el.closest('.book');
+    setHover(bk ? books[+bk.dataset.i] : null);
+  }
+
+  (function loop() {
+    const d = tx - x;
+    if (Math.abs(d) > .3) { x += d * .12; dirty = true; } else if (x !== tx) { x = tx; dirty = true; }
+    track.style.transform = `translate3d(${-x}px,0,0)`;
+    if (dirty && document.getElementById('modal').hidden) { hit(); dirty = false; }
+    requestAnimationFrame(loop);
+  })();
+
+  addEventListener('resize', () => { layout(); clampT(); dirty = true; });
+
+  function showLast() {
+    const b = books[books.length - 1];
+    setHover(null);
+    forced = b;
+    const grow = parseFloat(b.el.style.getPropertyValue('--W')) - parseFloat(b.el.style.getPropertyValue('--T'));
+    b.el.classList.add('lift', 'open');
+    tx = maxX() + grow;
+  }
+
+  // ---------- background: a random mountain every 10 seconds ----------
+  // Local photos in assets/day06-bg are used when present; otherwise five drawn mountain scenes stand in.
+  function paintMountain(k) {
+    const W = 1600, H = 700, cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+    const c = cv.getContext('2d'), r = rng(700 + k);
+    const lg = (y0, y1, stops) => { const g = c.createLinearGradient(0, y0, 0, y1); stops.forEach(([t, col]) => g.addColorStop(t, col)); return g; };
+    const ridgePts = (base, amp, rough, n = 160) => { const pts = []; let y = base; for (let i = 0; i <= n; i++) { y += (r() - .5) * rough; y = Math.max(base - amp, Math.min(base + amp * .4, y)); pts.push([i / n * W, y]); } return pts; };
+    const peakPts = (cx, top, base, spread, jag) => { const pts = []; for (let x = 0; x <= W; x += 8) { const d = Math.abs(x - cx) / spread; let y = top + (base - top) * Math.min(1, Math.pow(d, .9)); y += (r() - .5) * jag; pts.push([x, y]); } return pts; };
+    const fill = (pts, style, bottom = H) => { c.beginPath(); c.moveTo(0, bottom); pts.forEach(p => c.lineTo(p[0], p[1])); c.lineTo(W, bottom); c.closePath(); c.fillStyle = style; c.fill(); };
+    const cloud = (x, y, s, col) => { for (let i = 0; i < 9; i++) { c.fillStyle = col; c.beginPath(); c.ellipse(x + (r() - .5) * s * 2.4, y + (r() - .5) * s * .5, s * (.4 + r() * .5), s * (.25 + r() * .3), 0, 0, 7); c.fill(); } };
+    const snow = (pts, col, depth) => { c.save(); c.beginPath(); c.moveTo(0, H); pts.forEach(p => c.lineTo(p[0], p[1])); c.lineTo(W, H); c.clip(); c.fillStyle = col; pts.forEach((p, i) => { if (i % 2 === 0) c.fillRect(p[0] - 3, p[1], 6 + r() * 6, depth * (.3 + r() * .7)); }); c.restore(); };
+    const walker = (x, y, s) => { c.fillStyle = '#1d1d22'; c.fillRect(x - s * .18, y - s * 1.5, s * .36, s * .5); c.fillStyle = '#c8322a'; c.fillRect(x - s * .16, y - s * 1.05, s * .32, s * .55); c.fillRect(x - s * .12, y - s * .5, s * .1, s * .5); c.fillRect(x + s * .02, y - s * .5, s * .1, s * .5); c.fillStyle = '#2a201a'; c.beginPath(); c.arc(x, y - s * 1.6, s * .12, 0, 7); c.fill(); };
+    if (k === 0) { // golden peak at sunset
+      c.fillStyle = lg(0, H, [[0, '#3f6273'], [.55, '#c9a27a'], [1, '#e9b46a']]); c.fillRect(0, 0, W, H);
+      for (let i = 0; i < 16; i++) cloud(r() * W, 120 + r() * 260, 50 + r() * 70, `rgba(255,${190 + r() * 40},${130 + r() * 50},.35)`);
+      fill(peakPts(1050, 190, 620, 520, 14), lg(190, 620, [[0, '#f4c27a'], [1, '#8a5a40']]));
+      fill(peakPts(420, 330, 640, 380, 18), lg(330, 640, [[0, '#e8b57e'], [1, '#6e4a3a']]));
+      fill(ridgePts(600, 60, 12), '#2c2a33'); walker(1150, 560, 46);
+    } else if (k === 1) { // pink dawn over white peaks
+      c.fillStyle = lg(0, H, [[0, '#f6e2dc'], [.5, '#f3c6b6'], [1, '#d7a89a']]); c.fillRect(0, 0, W, H);
+      for (let i = 0; i < 14; i++) cloud(r() * W, 200 + r() * 260, 70 + r() * 80, 'rgba(255,240,235,.45)');
+      const p = peakPts(1150, 90, 520, 560, 16); fill(p, lg(90, 520, [[0, '#fff1ea'], [1, '#9aa1ad']])); snow(p, 'rgba(255,255,255,.6)', 90);
+      fill(peakPts(250, 60, 600, 420, 20), '#3b393c');
+      fill(ridgePts(430, 50, 10), lg(430, H, [[0, '#3a3029'], [1, '#1d1814']])); walker(820, 440, 60);
+    } else if (k === 2) { // mist and a long dark slope
+      c.fillStyle = lg(0, H, [[0, '#e6e2e6'], [1, '#c9ccd2']]); c.fillRect(0, 0, W, H);
+      [.78, .7, .62].forEach((v, i) => fill(peakPts(300 + i * 500, 180 + i * 30, 560, 380, 30), `rgba(${v * 200},${v * 205},${v * 215},.55)`));
+      c.beginPath(); c.moveTo(0, 560); c.lineTo(1600, 140); c.lineTo(1600, H); c.lineTo(0, H); c.closePath(); c.fillStyle = lg(140, H, [[0, '#4a4d4e'], [1, '#2a2c2d']]); c.fill();
+      for (let i = 0; i < 200; i++) { c.fillStyle = `rgba(0,0,0,${r() * .18})`; c.fillRect(r() * W, 300 + r() * 400, 20 + r() * 80, 2 + r() * 4); }
+      walker(560, 420, 14);
+    } else if (k === 3) { // bright snowfield under blue sky
+      c.fillStyle = lg(0, 260, [[0, '#4d76b8'], [1, '#b8cbe6']]); c.fillRect(0, 0, W, H);
+      cloud(900, 90, 90, 'rgba(255,255,255,.6)');
+      fill(peakPts(1450, 20, 520, 500, 10), lg(20, 520, [[0, '#ffffff'], [1, '#c9d1da']]));
+      c.beginPath(); c.moveTo(0, 60); c.bezierCurveTo(500, 120, 1100, 300, 1600, 560); c.lineTo(1600, H); c.lineTo(0, H); c.closePath(); c.fillStyle = lg(60, H, [[0, '#f7f8fa'], [1, '#d7dde5']]); c.fill();
+      [[300, 130, 140], [780, 200, 170], [1060, 280, 150]].forEach(([x, y, s]) => { c.fillStyle = '#4b4440'; c.beginPath(); c.ellipse(x, y, s, s * .55, -.2, 0, 7); c.fill(); });
+      c.strokeStyle = 'rgba(120,140,170,.45)'; c.lineWidth = 3; for (let i = 0; i < 8; i++) { c.beginPath(); const y = 250 + i * 50; c.moveTo(0, y); c.bezierCurveTo(300, y - 20, 500, y + 30, 700 + r() * 200, y + 60); c.stroke(); }
+      walker(560, 520, 26);
+    } else { // brown rock towers and a red flag
+      c.fillStyle = lg(0, H, [[0, '#6f9ad0'], [.6, '#d6e2ef'], [1, '#e9eef4']]); c.fillRect(0, 0, W, H);
+      for (let i = 0; i < 8; i++) cloud(r() * 600, 80 + r() * 200, 60 + r() * 60, 'rgba(255,255,255,.7)');
+      fill(peakPts(300, 360, 560, 360, 20), '#6f7480');
+      c.fillStyle = lg(0, H, [[0, '#5a4636'], [1, '#2b221b']]); c.beginPath(); c.moveTo(500, H); c.lineTo(640, 40); c.lineTo(900, 70); c.lineTo(1000, 200); c.lineTo(1180, 30); c.lineTo(1480, 60); c.lineTo(1600, 160); c.lineTo(1600, H); c.closePath(); c.fill();
+      c.fillStyle = 'rgba(255,255,255,.8)'; c.beginPath(); c.moveTo(650, 640); c.lineTo(1100, 470); c.lineTo(1130, 490); c.lineTo(700, 660); c.fill();
+      fill(ridgePts(650, 20, 6), '#3a3029'); walker(1340, 640, 70);
+      c.fillStyle = '#c8322a'; c.beginPath(); c.moveTo(0, 600); c.lineTo(90, 680); c.lineTo(0, 690); c.fill();
+    }
+    const v = c.createRadialGradient(W / 2, H / 2, H * .3, W / 2, H / 2, W * .7); v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(0,0,0,.25)'); c.fillStyle = v; c.fillRect(0, 0, W, H);
+    return cv.toDataURL('image/jpeg', .86);
+  }
+  (() => {
+    const layers = [document.getElementById('bgA'), document.getElementById('bgB')];
+    let BGS = null, cur = -1, front = 0;
+    function next() {
+      let n; do { n = Math.floor(Math.random() * BGS.length); } while (n === cur && BGS.length > 1);
+      cur = n; front = 1 - front;
+      layers[front].style.backgroundImage = `url("${BGS[n]}")`;
+      layers[front].classList.add('on'); layers[1 - front].classList.remove('on');
+    }
+    function start(list) { BGS = list; next(); setInterval(next, 10000); }
+    const probe = new Image();
+    probe.onload = () => { const list = [1, 2, 3, 4, 5].map(n => `assets/day06-bg/bg${n}.webp`); list.forEach(s => { new Image().src = s; }); start(list); };
+    probe.onerror = () => start([0, 1, 2, 3, 4].map(paintMountain));
+    probe.src = 'assets/day06-bg/bg1.webp';
+  })();
+
+  // ---------- camera ----------
+  const modal = document.getElementById('modal');
+  const frame = document.getElementById('frame');
+  const video = document.getElementById('video');
+  const still = document.getElementById('still');
+  const msg = document.getElementById('msg');
+  const count = document.getElementById('count');
+  const shutter = document.getElementById('shutter');
+  const liveRow = document.getElementById('liveRow');
+  const doneRow = document.getElementById('doneRow');
+  const resetWrap = document.getElementById('resetWrap');
+  const fileIn = document.getElementById('file');
+  let stream = null, bw = true, shot = null, counting = 0;
+
+  function setBW(v) {
+    bw = v; frame.classList.toggle('bw', bw);
+    liveRow.querySelectorAll('.seg button').forEach(btn => btn.setAttribute('aria-pressed', String((btn.dataset.bw === '1') === bw)));
+  }
+  liveRow.querySelectorAll('.seg button').forEach(btn => btn.addEventListener('click', () => setBW(btn.dataset.bw === '1')));
+
+  function showMsg(t) { msg.textContent = t; msg.hidden = !t; }
+
+  async function openCam() {
+    modal.hidden = false; setHover(null);
+    resetWrap.hidden = !custom;
+    toLive();
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { showMsg('이 화면에서는 카메라를 쓸 수 없어요. 사진 불러오기로 표지를 넣을 수 있어요.'); shutter.hidden = true; return; }
+    showMsg('카메라를 켜는 중…');
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 960 } }, audio: false });
+      if (modal.hidden) { stopCam(); return; }
+      video.srcObject = stream; await video.play();
+      showMsg(''); shutter.hidden = false;
+    } catch (e) {
+      shutter.hidden = true;
+      showMsg('카메라를 쓸 수 없어요. 브라우저의 카메라 권한을 확인하거나, 사진 불러오기로 표지를 넣어 주세요.');
+    }
+  }
+  function stopCam() { if (stream) stream.getTracks().forEach(t => t.stop()); stream = null; video.srcObject = null; }
+  function closeCam() { clearInterval(counting); count.textContent = ''; stopCam(); modal.hidden = true; dirty = true; }
+
+  function toLive() {
+    shot = null; still.hidden = true; video.hidden = false;
+    liveRow.hidden = false; doneRow.hidden = true;
+  }
+  function toDone() {
+    still.hidden = false; video.hidden = true;
+    liveRow.hidden = true; doneRow.hidden = false;
+  }
+
+  function crop34(src, sw, sh, mirror) {
+    const ctx = still.getContext('2d');
+    const r = 3 / 4; let cw = sw, ch = sw / r;
+    if (ch > sh) { ch = sh; cw = sh * r; }
+    ctx.save(); ctx.clearRect(0, 0, still.width, still.height);
+    if (mirror) { ctx.translate(still.width, 0); ctx.scale(-1, 1); }
+    ctx.drawImage(src, (sw - cw) / 2, (sh - ch) / 2, cw, ch, 0, 0, still.width, still.height);
+    ctx.restore();
+    shot = still.toDataURL('image/jpeg', .86);
+  }
+
+  shutter.addEventListener('click', () => {
+    if (!stream || counting) return;
+    let n = 3; count.textContent = n;
+    counting = setInterval(() => {
+      n--;
+      if (n > 0) { count.textContent = n; return; }
+      clearInterval(counting); counting = 0; count.textContent = '';
+      crop34(video, video.videoWidth, video.videoHeight, true);
+      toDone();
+    }, 700);
+  });
+
+  document.getElementById('pick').addEventListener('click', () => fileIn.click());
+  fileIn.addEventListener('change', () => {
+    const f = fileIn.files && fileIn.files[0]; if (!f) return;
+    const url = URL.createObjectURL(f); const im = new Image();
+    im.onload = () => { crop34(im, im.naturalWidth, im.naturalHeight, false); URL.revokeObjectURL(url); showMsg(''); toDone(); };
+    im.src = url; fileIn.value = '';
+  });
+  document.getElementById('retake').addEventListener('click', () => { toLive(); if (!stream) shutter.hidden = true; });
+  document.getElementById('apply').addEventListener('click', async () => {
+    if (!shot) return;
+    custom = { img: shot, bw, date: fmt(new Date()) };
+    store.set('life-last-cover', custom);
+    await loadCustom();
+    drawLast(books[books.length - 1].cv);
+    closeCam(); showLast();
+  });
+  document.getElementById('reset').addEventListener('click', () => {
+    custom = null; customImg = null; store.del('life-last-cover');
+    drawLast(books[books.length - 1].cv);
+    closeCam(); showLast();
+  });
+  document.getElementById('cta').addEventListener('click', openCam);
+  document.getElementById('close').addEventListener('click', closeCam);
+  modal.addEventListener('click', e => { if (e.target === modal) closeCam(); });
+
+  window.__life = { books, showLast, get tx() { return tx; }, set tx(v) { tx = v; clampT(); }, setHover: i => setHover(books[i] || null) };
+})();
+</script>
+</body></html>

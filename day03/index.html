@@ -1,0 +1,772 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><style>body{margin:0;font:14px system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style></head><body><title>Runaway</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+  /* Layout: a white stage drawn sharp; only the dancer is in big, hard-edged pixels. The keyboard plays a two-octave piano and every note is written onto the staff at its pitch. A single staff runs across the middle, a piano keyboard fills the bottom, and a ballerina in black stands on the staff right above the one key that plays. Score and judgments are drawn on the canvas. */
+  :root {
+    color-scheme: light;
+    --stage: #ffffff;       /* a plain white stage */
+    --ink: #111111;         /* staff, notes, the dancer */
+    --staff: #a6a6a6;
+    --missed: #d4d4d4;
+    --shadow: #e8e8e8;
+    --accent: #c8102e;      /* the felt strip and the playing key */
+    --hit: #c4161c;         /* played notes, judgments, the score's highlights */
+    --ivory: #fbfaf7;
+    --ivory-edge: #cfcac0;
+    --ivory-down: #e4e0d7;
+    --ebony: #121212;
+  }
+  html, body { height: 100%; }
+  body {
+    background: var(--stage);
+    overflow: hidden;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    -webkit-user-select: none; user-select: none;
+  }
+  #cv { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; outline: none; }
+
+
+  /* the note guide: type note names, and the piano shows which key comes next */
+  #guide {
+    position: fixed; top: 16px; right: max(16px, env(safe-area-inset-right, 0px));
+    display: flex; gap: 6px; width: min(440px, calc(100vw - 32px));
+    font: 600 12px/1 system-ui, sans-serif;
+  }
+  #guide input {
+    flex: 1; min-width: 0; height: 32px; padding: 0 10px; border-radius: 6px;
+    font: 500 13px/1 ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--ink);
+    background: var(--stage); border: 1px solid var(--staff);
+  }
+  #guide input:focus { outline: none; border-color: var(--ink); }
+  #guide button {
+    height: 32px; padding: 0 12px; border-radius: 6px; cursor: pointer; white-space: nowrap;
+    font: inherit; color: var(--ink); background: var(--stage); border: 1px solid var(--staff);
+  }
+  #guide button[aria-pressed="true"] { color: var(--hit); border-color: var(--hit); }
+</style>
+
+<canvas id="cv" tabindex="0" aria-label="오선 위의 픽셀 발레리나와 아래쪽 피아노. 키보드 두 줄로 두 옥타브 반을 칠 수 있고, 친 음이 오선 위에 악보로 남아요. 엔터를 누르면 다시 들려줘요."></canvas>
+<div id="guide">
+  <input id="guide-text" type="text" spellcheck="false" autocomplete="off" aria-label="칠 음 순서" placeholder="칠 음을 적어 보세요 · 예: E5x4 D#5 C#5 A4">
+  <button id="guide-on" type="button" aria-pressed="false">가이드 켜기</button>
+</div>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const cv = $('cv');
+  const screen = cv.getContext('2d');
+  // Only the dancer is drawn small and blown up into hard pixels; everything else is drawn sharp at full resolution.
+  // the dancer goes on her own small layer, whose soft edges are cut back to whole pixels
+  const ink = document.createElement('canvas'), inkCtx = ink.getContext('2d', { willReadFrequently: true });
+  let ctx = screen;
+  const css = getComputedStyle(document.documentElement);
+  const C = {};
+  ['stage', 'ink', 'staff', 'missed', 'shadow', 'accent', 'hit', 'ivory', 'ivory-edge', 'ivory-down', 'ebony']
+    .forEach((k) => { C[k] = css.getPropertyValue('--' + k).trim(); });
+  const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* ---------- what you play: notes from C4 to E6, as long as you hold them ---------- */
+  const BPM = 87;
+  const BEAT = 60 / BPM;   // only for spacing and for naming note lengths
+  const REST = 2;          // the longest silence the score keeps between two notes, in seconds
+  const HOLD = 0.35;       // a press held longer than this makes her hold a pose
+  const LOW = 60, HIGH = 88;  // MIDI numbers of C4 and E6
+  // Two rows of the keyboard are two octaves, the way music trackers lay them out:
+  // the bottom row from Z is C4 up, the top row from Q is C5 up, with the black keys on the row above each.
+  const KEYMAP = {
+    KeyZ: 60, KeyS: 61, KeyX: 62, KeyD: 63, KeyC: 64, KeyV: 65, KeyG: 66, KeyB: 67, KeyH: 68, KeyN: 69, KeyJ: 70, KeyM: 71,
+    Comma: 72, KeyL: 73, Period: 74, Semicolon: 75, Slash: 76,
+    KeyQ: 72, Digit2: 73, KeyW: 74, Digit3: 75, KeyE: 76, KeyR: 77, Digit5: 78, KeyT: 79, Digit6: 80, KeyY: 81, Digit7: 82, KeyU: 83,
+    KeyI: 84, Digit9: 85, KeyO: 86, Digit0: 87, KeyP: 88,
+    Space: 76,
+  };
+  // the label printed on each piano key: the top row wins where both rows reach
+  const LABEL = {};
+  Object.entries(KEYMAP).forEach(([code, m]) => {
+    if (code === 'Space') return;
+    const upper = /^(Key[QWERTYUIOP]|Digit)/.test(code);
+    if (m >= 72 ? !upper : upper) return;
+    LABEL[m] = { Comma: ',', Period: '.', Semicolon: ';', Slash: '/' }[code] || code.replace(/^Key|^Digit/, '');
+  });
+  const NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+  const LETTER = [0, 0, 1, 1, 2, 3, 3, 4, 4, 5, 5, 6];   // staff letter for each pitch class
+  const SHARP = [0, 1, 0, 1, 0, 0, 1, 0, 1, 0, 1, 0];
+  const stepOf = (m) => (Math.floor(m / 12) - 1) * 7 + LETTER[m % 12];  // diatonic steps; E4, the bottom line, is 30
+  const freqOf = (m) => 440 * Math.pow(2, (m - 69) / 12);
+
+  const STORE = 'runaway-piano';
+  let tape = [];           // { t: seconds into the score, d: how long it was held, m: MIDI note }
+  try { const saved = JSON.parse(localStorage.getItem(STORE) || 'null'); if (Array.isArray(saved)) tape = saved; } catch (_) {}
+  const lastT = () => (tape.length ? tape[tape.length - 1].t : 0);
+  const save = () => { try { localStorage.setItem(STORE, JSON.stringify(tape.slice(-800))); } catch (_) {} };
+
+  let phase = tape.length ? 'free' : 'ready';  // 'ready' | 'free' | 'replay'
+  let base = lastT() + REST, wallStart = 0;   // the score's clock: base + time since wallStart
+  let viewT = base;                           // the score time sitting on the dancer's line
+  const shownAt = new Map();                  // note index -> when it last sounded
+
+  /* the note guide: a list of notes to play in order, typed in by whoever is playing */
+  // Names like E, D#, Bb, with an optional octave (E5) and a repeat (E5x4); arrows, commas and "4번" work too.
+  const GUIDE_STORE = 'runaway-guide';
+  const DEFAULT_GUIDE = '';  // the page ships with no tune in it; whatever is typed stays in this browser
+  function parseGuide(src) {
+    const out = [];
+    let oct = 5;
+    const tokens = src.replace(/->|→|,|\//g, ' ').split(/\s+/).filter(Boolean);
+    for (const tok of tokens) {
+      const rpt = /^[x×*]?(\d+)(번|회)?$/.exec(tok);
+      if (rpt && out.length && (tok.startsWith('x') || tok.startsWith('×') || tok.startsWith('*') || rpt[2])) {
+        for (let k = 1; k < +rpt[1]; k++) out.push(out[out.length - 1]);
+        continue;
+      }
+      const m = /^([A-Ga-g])([#♯b♭]?)(\d)?(?:[x×*](\d+))?$/.exec(tok);
+      if (!m) continue;
+      if (m[3]) oct = +m[3];
+      let midi = (oct + 1) * 12 + { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 }[m[1].toUpperCase()];
+      if (m[2] === '#' || m[2] === '♯') midi++;
+      if (m[2] === 'b' || m[2] === '♭') midi--;
+      midi = Math.max(LOW, Math.min(HIGH, midi));
+      for (let k = 0; k < (m[4] ? +m[4] : 1); k++) out.push(midi);
+    }
+    return out;
+  }
+  let guideText = DEFAULT_GUIDE, guideOn = false;
+  try {
+    const g = JSON.parse(localStorage.getItem(GUIDE_STORE) || 'null');
+    if (g && typeof g.text === 'string') { guideText = g.text; guideOn = !!g.on; }
+  } catch (_) {}
+  let guide = parseGuide(guideText), gi = 0;
+  let guideDoneAt = -10;
+  const saveGuide = () => { try { localStorage.setItem(GUIDE_STORE, JSON.stringify({ text: guideText, on: guideOn })); } catch (_) {} };
+  const target = () => (guideOn && guide.length ? guide[gi] : null);
+
+  /* ---------- layout ---------- */
+  let W = 0, H = 0, dpr = 1;
+  const L = {};
+  // C4..E6: the white keys of the piano at the bottom
+  const WHITE = 17;
+  const BLACK_AFTER = [0, 1, 3, 4, 5];  // white keys (within an octave) followed by a black key
+
+  function resize() {
+    W = innerWidth; H = innerHeight;
+    dpr = Math.min(2, window.devicePixelRatio || 1);
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+    L.pianoH = Math.max(120, Math.min(210, H * 0.25));
+    L.pianoTop = H - L.pianoH;
+    L.keyW = W / WHITE;
+    // stage pixels, and finer ones for the lettering so it stays readable
+    L.px = Math.max(3, Math.round(Math.min(W, H) / 170));
+    L.g = Math.max(9, Math.min(14, H * 0.018));
+    L.staffBottom = Math.round(L.pianoTop - Math.max(56, H * 0.12));
+    L.top = L.staffBottom - 4 * L.g;          // the staff's top line
+    L.floor = L.top - 4 * L.g;                // she dances just above the highest ledger line
+    L.hitX = Math.round(W * 0.34);            // where notes are written
+    L.ppb = Math.max(90, Math.min(170, W * 0.11));  // pixels per beat
+    L.s = Math.max(0.8, Math.min(1.6, H / 700)) * 1.1;
+    ink.width = Math.ceil(W / L.px); ink.height = Math.ceil(H / L.px);
+  }
+
+  // every pixel is either fully there or not at all: no grey fringe, like a sprite
+  function hardEdges() {
+    const img = inkCtx.getImageData(0, 0, ink.width, ink.height), d = img.data;
+    for (let i = 3; i < d.length; i += 4) {
+      if (d[i] > 110) {
+        const a = d[i] / 255;  // undo the blend toward transparent so the colour stays true
+        d[i - 3] = Math.min(255, d[i - 3] / a); d[i - 2] = Math.min(255, d[i - 2] / a); d[i - 1] = Math.min(255, d[i - 1] / a);
+        d[i] = 255;
+      } else d[i] = 0;
+    }
+    inkCtx.putImageData(img, 0, 0);
+  }
+
+  /* ---------- sound: a piano in a big room ---------- */
+  let ac = null, bus = null;
+  function audio() {
+    if (ac) { if (ac.state === 'suspended') ac.resume(); return ac; }
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return null;
+    ac = new AC();
+    const comp = ac.createDynamicsCompressor();
+    comp.threshold.value = -14; comp.ratio.value = 3;
+    comp.connect(ac.destination);
+    bus = ac.createGain(); bus.gain.value = 0.55;
+    const verb = ac.createConvolver();
+    const len = Math.floor(ac.sampleRate * 3.2);
+    const ir = ac.createBuffer(2, len, ac.sampleRate);
+    for (let ch = 0; ch < 2; ch++) {
+      const d = ir.getChannelData(ch);
+      for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3.2);
+    }
+    verb.buffer = ir;
+    const wet = ac.createGain(); wet.gain.value = 0.42;
+    bus.connect(comp);
+    bus.connect(verb); verb.connect(wet); wet.connect(comp);
+    return ac;
+  }
+  function ding(vel, freq = 659.25) {
+    const a = audio();
+    if (!a) return;
+    const t0 = a.currentTime + 0.005;
+    const f0 = freq, B = 0.00035, gains = [];
+    const low = Math.sqrt(659.25 / freq);  // lower strings ring longer
+    for (let n = 1; n <= 9; n++) {
+      const f = f0 * n * Math.sqrt(1 + B * n * n);
+      const amp = vel * 0.22 * Math.pow(n, -1.2) * (n === 1 ? 1 : 0.7);
+      const tail = (2.4 * low) / Math.pow(n, 0.65);
+      [0, n === 1 ? 1.8 : 0].forEach((cents, k) => {
+        if (k && !cents) return;
+        const o = a.createOscillator();
+        o.frequency.value = f; o.detune.value = cents;
+        const g = a.createGain();
+        g.gain.setValueAtTime(0, t0);
+        g.gain.linearRampToValueAtTime(amp, t0 + 0.004);
+        g.gain.setTargetAtTime(amp * 0.38, t0 + 0.005, 0.09);
+        g.gain.setTargetAtTime(0, t0 + 0.3, tail);
+        o.connect(g); g.connect(bus);
+        o.start(t0); o.stop(t0 + 7);
+        gains.push(g);
+      });
+    }
+    // the hammer
+    const nb = a.createBuffer(1, Math.floor(a.sampleRate * 0.04), a.sampleRate);
+    const d = nb.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / d.length);
+    const src = a.createBufferSource(); src.buffer = nb;
+    const bp = a.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 2600; bp.Q.value = 0.9;
+    const hg = a.createGain(); hg.gain.value = 0.12 * vel;
+    src.connect(bp); bp.connect(hg); hg.connect(bus);
+    src.start(t0);
+    // a held note rings on its own; letting go brings the damper down
+    return {
+      damp() {
+        const t = a.currentTime;
+        gains.forEach((g) => {
+          if (g.gain.cancelAndHoldAtTime) g.gain.cancelAndHoldAtTime(t); else g.gain.cancelScheduledValues(t);
+          g.gain.setTargetAtTime(0, t, 0.09);
+        });
+      },
+    };
+  }
+
+  /* ---------- the dancer ---------- */
+  // Angles are absolute, in degrees from straight down; positive swings toward the way she faces (right).
+  const POSE = {
+    // the cover pose: on pointe, legs crossed, one arm reaching high and the other low to the side
+    stand:  { T: 182, L: [8, -5],    R: [-2, 1],    aL: [-58, -44],  aR: [152, 146] },
+    plie:   { T: 180, L: [-30, 22],  R: [30, -22],  aL: [-82, -96],  aR: [82, 96] },
+    up:     { T: 180, L: [2, 0],     R: [-2, 0],    aL: [-145, 125], aR: [145, -125] },
+    jete:   { T: 172, L: [-96, -102], R: [94, 100], aL: [-100, -94], aR: [126, 114] },
+    arab:   { T: 160, L: [-100, -103], R: [-2, -2], aL: [-76, -70],  aR: [116, 106] },
+    retire: { T: 180, L: [0, 0],     R: [76, -32],  aL: [-145, 125], aR: [145, -125] },
+    attit:  { T: 174, L: [-96, -150], R: [-2, -2],  aL: [-100, -82], aR: [160, -150] },
+    wobble: { T: 196, L: [10, 4],    R: [-14, -6],  aL: [-120, -150], aR: [70, 40] },
+    bow:    { T: 140, L: [-40, -30], R: [6, 2],     aL: [-30, -10],  aR: [60, 40] },
+  };
+  const MOVES = {
+    saute: [[0.08, 'plie', 0], [0.30, 'up', 72], [0.52, 'plie', 0], [0.85, 'stand', 0]],
+    jete:  [[0.08, 'plie', 0], [0.33, 'jete', 96], [0.58, 'plie', 0], [0.92, 'stand', 0]],
+    pirou: [[0.08, 'plie', 0], [0.18, 'retire', 8, 0], [0.74, 'retire', 8, 2], [0.95, 'stand', 0, 2]],
+    arab:  [[0.08, 'plie', 0], [0.26, 'arab', 34], [0.44, 'arab', 0], [0.78, 'arab', 0], [1.1, 'stand', 0]],
+    attit: [[0.08, 'plie', 0], [0.31, 'attit', 78], [0.54, 'plie', 0], [0.88, 'stand', 0]],
+    hop:   [[0.06, 'plie', 0], [0.17, 'stand', 14], [0.30, 'stand', 0]],
+    small: [[0.07, 'plie', 0], [0.22, 'up', 34], [0.38, 'plie', 0], [0.6, 'stand', 0]],
+    miss:  [[0.12, 'wobble', 0], [0.30, 'wobble', 0], [0.6, 'stand', 0]],
+    bow:   [[0.5, 'bow', 0], [2.2, 'bow', 0], [2.9, 'stand', 0]],
+    hold:  [[0.3, 'arab', 6], [0.5, 'arab', 0]],
+    release: [[0.4, 'stand', 0]],
+  };
+  const ORDER = ['saute', 'jete', 'pirou', 'saute', 'arab', 'attit', 'jete', 'pirou'];
+  let moveNo = 0;
+
+  const clonePose = (p) => ({ T: p.T, L: [...p.L], R: [...p.R], aL: [...p.aL], aR: [...p.aR] });
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const ease = (t) => 0.5 - 0.5 * Math.cos(Math.PI * t);
+  function mixPose(a, b, t) {
+    const m = (x, y) => [lerp(x[0], y[0], t), lerp(x[1], y[1], t)];
+    return { T: lerp(a.T, b.T, t), L: m(a.L, b.L), R: m(a.R, b.R), aL: m(a.aL, b.aL), aR: m(a.aR, b.aR) };
+  }
+
+  const dancer = { pose: clonePose(POSE.stand), lift: 0, spin: 0, move: null, t0: 0, flutter: 0 };
+  function dance(name, now) {
+    // every move starts from wherever she is right now, so a quick press cuts cleanly into the next one
+    const from = [0, null, dancer.lift, dancer.spin % 1];
+    from.pose = clonePose(dancer.pose);
+    dancer.move = [from, ...MOVES[name]];
+    dancer.t0 = now;
+    if (name !== 'hop') dancer.flutter = 1;
+  }
+  function stepDancer(now) {
+    const m = dancer.move;
+    if (!m) return;
+    const t = now - dancer.t0;
+    let i = 1;
+    while (i < m.length && m[i][0] < t) i++;
+    if (i >= m.length) { const last = m[m.length - 1]; dancer.pose = clonePose(POSE[last[1]]); dancer.lift = 0; dancer.spin = 0; dancer.move = null; return; }
+    const a = m[i - 1], b = m[i];
+    const k = (t - a[0]) / Math.max(1e-6, b[0] - a[0]);
+    const pa = a.pose || POSE[a[1]], pb = POSE[b[1]];
+    dancer.pose = mixPose(pa, pb, ease(k));
+    // rise fast and hang a little at the top; fall back with gravity
+    const up = b[2] > a[2];
+    dancer.lift = lerp(a[2], b[2], up ? Math.sin(k * Math.PI / 2) : k * k);
+    dancer.spin = lerp(a[3] || 0, b[3] || 0, reduceMotion ? 0 : ease(k));
+  }
+
+  const dir = (deg) => { const r = deg * Math.PI / 180; return [Math.sin(r), Math.cos(r)]; };
+  const at = (p, deg, len) => { const d = dir(deg); return [p[0] + d[0] * len, p[1] + d[1] * len]; };
+  function skeleton(p, s) {
+    const hip = [0, 0];
+    const leg = (a, off) => { const h = [off * s, 0]; const k = at(h, a[0], 30 * s); const an = at(k, a[1], 28 * s); return [h, k, an, at(an, a[1], 9 * s)]; };
+    const top = at(hip, p.T, 34 * s);
+    // shoulders sit either side of the spine, so the arms read clearly in silhouette
+    const side = (off) => at(top, p.T + 90, off * s);
+    const arm = (a, off) => { const sh = side(off); const e = at(sh, a[0], 21 * s); return [sh, e, at(e, a[1], 19 * s)]; };
+    return {
+      hip, top, waist: at(hip, p.T, 14 * s), neck: at(hip, p.T, 40 * s), head: at(hip, p.T, 48 * s),
+      L: leg(p.L, -2.5), R: leg(p.R, 2.5), aL: arm(p.aL, 6), aR: arm(p.aR, -6),
+    };
+  }
+  // one tapered, round-ended stretch of limb, filled rather than stroked
+  function seg(a, b, ra, rb) {
+    const dx = b[0] - a[0], dy = b[1] - a[1], d = Math.hypot(dx, dy) || 1;
+    const nx = -dy / d, ny = dx / d;
+    ctx.beginPath();
+    ctx.moveTo(a[0] + nx * ra, a[1] + ny * ra); ctx.lineTo(b[0] + nx * rb, b[1] + ny * rb);
+    ctx.lineTo(b[0] - nx * rb, b[1] - ny * rb); ctx.lineTo(a[0] - nx * ra, a[1] - ny * ra);
+    ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.arc(a[0], a[1], ra, 0, Math.PI * 2); ctx.arc(b[0], b[1], rb, 0, Math.PI * 2); ctx.fill();
+  }
+  function drawLeg(l, s) {
+    seg(l[0], l[1], 6.2 * s, 4.2 * s);   // thigh
+    seg(l[1], l[2], 4.0 * s, 2.2 * s);   // calf to ankle
+    seg(l[2], l[3], 2.4 * s, 1.5 * s);   // the pointe shoe
+  }
+  function drawArm(a, s) {
+    seg(a[0], a[1], 3.3 * s, 2.7 * s);
+    seg(a[1], a[2], 2.6 * s, 1.7 * s);
+  }
+  function drawDancer(now) {
+    const s = L.s, p = dancer.pose;
+    const sk = skeleton(p, s);
+    // stand her so the lowest toe touches the line
+    const toes = [sk.L[3], sk.R[3]];
+    const low = toes[0][1] > toes[1][1] ? toes[0] : toes[1];
+    const lift = dancer.lift * s;
+    const ox = L.hitX - low[0], oy = L.floor - 1 - low[1] - lift;
+
+    // her shadow on the line
+    const sh = Math.max(0.25, 1 - lift / (110 * s));
+    ctx.fillStyle = C.shadow;
+    ctx.beginPath(); ctx.ellipse(L.hitX, L.floor + 1, 26 * s * sh, 3 * s * sh, 0, 0, Math.PI * 2); ctx.fill();
+
+    ctx.save();
+    ctx.translate(ox, oy);
+    // a pirouette, faked by squashing her around the standing leg
+    const turn = Math.cos(dancer.spin * Math.PI * 2);
+    const pivot = low[0];
+    ctx.translate(pivot, 0); ctx.scale(Math.abs(turn) < 0.12 ? (turn < 0 ? -0.12 : 0.12) : turn, 1); ctx.translate(-pivot, 0);
+
+    ctx.fillStyle = C.ink;
+    drawLeg(sk.L, s);
+    drawLeg(sk.R, s);
+
+    // bodice: narrow at the waist, broad across the back
+    const across = (pt, w) => [at(pt, p.T + 90, w * s), at(pt, p.T - 90, w * s)];
+    const [h1, h2] = across(sk.hip, 6.4), [w1, w2] = across(sk.waist, 5), [t1, t2] = across(sk.top, 7.6);
+    ctx.beginPath();
+    ctx.moveTo(h1[0], h1[1]); ctx.quadraticCurveTo(w1[0], w1[1], t1[0], t1[1]);
+    ctx.lineTo(t2[0], t2[1]); ctx.quadraticCurveTo(w2[0], w2[1], h2[0], h2[1]);
+    ctx.closePath(); ctx.fill();
+    seg(sk.top, sk.neck, 2.2 * s, 1.8 * s);
+
+    // the tutu: a full bell of tulle that flares from the hips and shivers when she lands
+    dancer.flutter *= 0.94;
+    const tilt = (p.T - 180) * Math.PI / 180;
+    const tu = at(sk.hip, p.T, 3 * s);
+    ctx.save();
+    ctx.translate(tu[0], tu[1]); ctx.rotate(-tilt);
+    const shiver = Math.sin(now * 19) * dancer.flutter * 3 * s;
+    const brim = 42 * s, tipY = -1 * s + shiver, point = 27 * s;
+    ctx.fillStyle = C.ink;
+    ctx.beginPath();
+    ctx.moveTo(-7 * s, -6 * s);
+    ctx.quadraticCurveTo(-brim * 0.6, -6 * s, -brim, tipY - 3 * s);     // the brim, flat and a little upturned at the tip
+    ctx.quadraticCurveTo(-brim * 0.95, 6 * s, -brim * 0.55, 13 * s);   // under the brim, bowing out
+    ctx.quadraticCurveTo(-12 * s, 21 * s, -5 * s, point);              // down into the point over her thighs
+    ctx.lineTo(5 * s, point);
+    ctx.quadraticCurveTo(12 * s, 21 * s, brim * 0.55, 13 * s);
+    ctx.quadraticCurveTo(brim * 0.95, 6 * s, brim, tipY - 3 * s);
+    ctx.quadraticCurveTo(brim * 0.6, -6 * s, 7 * s, -6 * s);
+    ctx.closePath(); ctx.fill();
+    ctx.restore();
+
+    ctx.fillStyle = C.ink;
+    drawArm(sk.aL, s);
+    drawArm(sk.aR, s);
+    // head, a little tilted, and the bun on top
+    ctx.beginPath(); ctx.ellipse(sk.head[0], sk.head[1], 5.6 * s, 6.6 * s, -tilt, 0, Math.PI * 2); ctx.fill();
+    const bun = at(sk.head, p.T + 12, 6.4 * s);
+    ctx.beginPath(); ctx.arc(bun[0], bun[1], 3.6 * s, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+
+  /* ---------- playing ---------- */
+  let keyAt = -10;
+  const nowS = () => performance.now() / 1000;
+
+  // how she answers depends on how long it's been since the last note
+  let slow = 0, mid = 0, fast = 0, lastMoveAt = -10;
+  function pickMove(gap) {
+    if (gap > 1.6) return ['arab', 'attit', 'jete'][slow++ % 3];
+    if (gap > 0.55) return ['saute', 'jete', 'saute', 'attit'][mid++ % 4];
+    return ++fast % 4 === 0 ? 'pirou' : 'small';
+  }
+  // notes that are sounding: key -> { i, at, voice }; she holds a pose while any of them lasts
+  const sounding = new Map();
+  let posing = false;
+  function strike(key, i, now) {
+    const n = tape[i];
+    keyAt = now;
+    shownAt.set(i, now);
+    sounding.set(key, { i, at: now, voice: ding(1, freqOf(n.m)) });
+    // a chord is one move, not one per note
+    if (now - lastMoveAt > 0.06) { dance(n.move, now); lastMoveAt = now; }
+  }
+  function letGo(key, now) {
+    const s0 = sounding.get(key);
+    if (!s0) return null;
+    sounding.delete(key);
+    s0.voice && s0.voice.damp();
+    if (posing && !sounding.size) { posing = false; dance('release', now); }
+    return s0;
+  }
+
+  function press(code) {
+    const now = nowS();
+    audio();
+    if (phase === 'replay') stopReplay(now);
+    const raw = base + (now - wallStart);
+    if (!tape.length) { base = 0; wallStart = now; }
+    else if (raw > lastT() + REST && !sounding.size) { base = lastT() + REST; wallStart = now; }  // after a long pause, pick up one rest later
+    const t = +(base + (now - wallStart)).toFixed(3);
+    const prev = tape.length ? lastT() : -Infinity;
+    const m = KEYMAP[code];
+    let move = pickMove(t - prev);
+    if (target() != null) {
+      // the right key moves the guide on; any other key still sounds, she just wobbles
+      if (m === guide[gi]) {
+        gi++;
+        if (gi >= guide.length) { gi = 0; guideDoneAt = now; move = 'pirou'; }
+      } else move = 'miss';
+    }
+    tape.push({ t, d: 0, m, move });
+    phase = 'free';
+    strike(code, tape.length - 1, now);
+  }
+  function release(code) {
+    const now = nowS();
+    if (phase !== 'free') return;
+    const s0 = letGo(code, now);
+    if (!s0) return;
+    tape[s0.i].d = +(now - s0.at).toFixed(3);
+    save();
+  }
+
+  /* hearing it back: the piano plays the score again and she dances it again */
+  let rWall = 0, rFrom = 0, rNext = 0;
+  function startReplay(now) {
+    if (!tape.length) return;
+    [...sounding.keys()].forEach((k) => letGo(k, now));
+    phase = 'replay'; rFrom = tape[0].t - 1; rWall = now; rNext = 0;
+    shownAt.clear();
+  }
+  function stopReplay(now) {
+    [...sounding.keys()].forEach((k) => letGo(k, now));
+    phase = 'free';
+    base = lastT() + REST; wallStart = now;
+  }
+  let notice = null;  // { text, at }
+  function clearScore(now) {
+    [...sounding.keys()].forEach((k) => letGo(k, now));
+    tape = []; save(); shownAt.clear();
+    phase = 'ready'; base = 0; viewT = 0;
+    notice = { text: '악보를 지웠어요', at: now };
+  }
+
+  const held = new Set();
+  addEventListener('keydown', (e) => {
+    if (e.target === $('guide-text')) {
+      if (e.code === 'Enter' || e.code === 'Escape') { e.preventDefault(); applyGuide(); $('guide-text').blur(); cv.focus(); }
+      return;
+    }
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    if (e.code === 'Enter') {
+      e.preventDefault();
+      if (e.repeat) return;
+      const now = nowS();
+      if (phase === 'replay') stopReplay(now); else startReplay(now);
+      return;
+    }
+    if (e.code === 'Escape') { if (!e.repeat && tape.length) clearScore(nowS()); return; }
+    if (!(e.code in KEYMAP)) return;
+    e.preventDefault();
+    if (e.repeat || held.has(e.code)) return;
+    held.add(e.code); press(e.code);
+  });
+  addEventListener('keyup', (e) => { if (held.delete(e.code)) release(e.code); });
+
+  function showGuide() {
+    $('guide-on').setAttribute('aria-pressed', String(guideOn));
+    $('guide-on').textContent = guideOn ? '가이드 끄기' : '가이드 켜기';
+  }
+  function applyGuide() {
+    guideText = $('guide-text').value;
+    guide = parseGuide(guideText); gi = 0;
+    if (guide.length) guideOn = true;
+    saveGuide(); showGuide();
+  }
+  $('guide-text').value = guideText;
+  $('guide-text').addEventListener('change', applyGuide);
+  $('guide-on').addEventListener('mousedown', (e) => e.preventDefault());
+  $('guide-on').addEventListener('click', () => {
+    if (!guideOn) applyGuide(); else { guideOn = false; saveGuide(); showGuide(); }
+    gi = 0; cv.focus();
+  });
+  showGuide();
+  addEventListener('blur', () => { [...held].forEach((c) => release(c)); held.clear(); });
+
+  // on a touch screen, the piano keys themselves can be tapped
+  function keyAtPoint(x, y) {
+    if (y < L.pianoTop) return null;
+    const kw = L.keyW, bw = kw * 0.58, bh = L.pianoH * 0.6;
+    if (y < L.pianoTop + bh) {
+      for (const m of blackKeys()) { const bx = blackX(m); if (x >= bx && x <= bx + bw) return m; }
+    }
+    const i = Math.floor(x / kw);
+    return whiteMidi(Math.max(0, Math.min(WHITE - 1, i)));
+  }
+  cv.addEventListener('pointerdown', (e) => {
+    cv.focus();
+    audio();
+    if (e.pointerType !== 'touch') return;
+    const m = keyAtPoint(e.clientX, e.clientY);
+    if (m == null) return;
+    e.preventDefault();
+    const code = 'touch' + e.pointerId;
+    KEYMAP[code] = m; held.add(code); press(code);
+  });
+  addEventListener('pointerup', (e) => { const code = 'touch' + e.pointerId; if (held.delete(code)) release(code); });
+
+  function tick(now) {
+    if (phase === 'replay') {
+      viewT = rFrom + (now - rWall);
+      while (rNext < tape.length && tape[rNext].t <= viewT) { strike('r' + rNext, rNext, now); rNext++; }
+      // each replayed note rings as long as it was held
+      for (const [k, s0] of sounding) {
+        const d = tape[s0.i].d || 0.12;
+        if (!posing && d > HOLD && now - s0.at > HOLD) { posing = true; dance('hold', now); }
+        if (now - s0.at >= d) letGo(k, now);
+      }
+      if (rNext >= tape.length && !sounding.size && viewT > lastT() + 1.5) stopReplay(now);
+    } else {
+      if (!posing) for (const s0 of sounding.values()) if (now - s0.at > HOLD) { posing = true; dance('hold', now); break; }
+      // the score runs while you play, and comes to rest one rest after the last note
+      const raw = base + (now - wallStart);
+      viewT = tape.length ? Math.min(raw, sounding.size ? Infinity : lastT() + REST) : 0;
+    }
+    stepDancer(now);
+  }
+
+  /* ---------- lettering ---------- */
+  function text(t, x, y, size, color, weight = 600, align = 'left') {
+    ctx.font = `${weight} ${size}px system-ui, sans-serif`;
+    ctx.fillStyle = color; ctx.textAlign = align; ctx.textBaseline = 'alphabetic';
+    ctx.fillText(t, x, y);
+  }
+  function drawHud(now) {
+    const pad = Math.max(16, W * 0.03), s = Math.max(0.9, Math.min(1.3, W / 1100));
+    const soft = 'rgba(0,0,0,0.5)';
+    const cx = W * 0.68, top = L.floor - 150 * L.s;
+    if (target() != null || now - guideDoneAt < 1.6) {
+      const msg = now - guideDoneAt < 1.6 ? '끝까지 쳤어요! 처음부터 다시' : `다음 음 ${NAMES[guide[gi] % 12]}${Math.floor(guide[gi] / 12) - 1} · ${gi + 1}/${guide.length}`;
+      text(msg, L.hitX + 24, L.top - L.g * 4.6, 14 * L.s, C.hit, 700, 'left');
+    }
+    if (phase === 'ready') {
+      text('Runaway', cx, top, 30 * L.s, C.ink, 700, 'center');
+      text('키보드로 피아노를 쳐 보세요', cx, top + 28 * L.s, 15 * L.s, 'rgba(0,0,0,0.65)', 600, 'center');
+      text('아랫줄 Z X C V … 는 C4부터, 윗줄 Q W E R … 는 C5부터', cx, top + 50 * L.s, 13 * L.s, soft, 500, 'center');
+      text('그 위 줄(S D G H J · 2 3 5 6 7)은 검은 건반 · 길게 누르면 길게 울려요', cx, top + 70 * L.s, 13 * L.s, soft, 500, 'center');
+    } else {
+      text(`음표 ${tape.length}개`, pad, pad + 22 * s, 20 * s, C.ink, 700);
+      text(phase === 'replay' ? '다시 듣는 중 · enter 멈춤' : 'enter 다시 듣기 · esc 지우기', pad, pad + 44 * s, 13 * s, phase === 'replay' ? C.hit : soft, 600);
+      if (phase === 'replay') {
+        const prog = Math.max(0, Math.min(1, (viewT - tape[0].t) / Math.max(0.1, lastT() - tape[0].t)));
+        ctx.fillStyle = 'rgba(0,0,0,0.08)'; ctx.fillRect(0, 0, W, 4);
+        ctx.fillStyle = C.hit; ctx.fillRect(0, 0, W * prog, 4);
+      }
+    }
+    if (notice && now - notice.at < 1.4) text(notice.text, cx, top, 15 * L.s, C.hit, 600, 'center');
+  }
+
+  /* ---------- drawing ---------- */
+  function drawStage() {
+    ctx.fillStyle = C.stage; ctx.fillRect(0, 0, W, H);
+  }
+
+  // a note's name depends on how long it lasts before the next note starts
+  function valueOf(i) {
+    const n = tape[i];
+    let j = i + 1;
+    while (j < tape.length && tape[j].t - n.t < 0.06) j++;  // skip the rest of a chord
+    const gap = j < tape.length ? tape[j].t - n.t : Infinity;
+    const len = gap >= REST - 0.01 ? Math.max(n.d, 0.2) : gap;
+    const q = len / BEAT;
+    return q < 0.6 ? 'eighth' : q < 1.4 ? 'quarter' : q < 2.8 ? 'half' : 'whole';
+  }
+  const yOfStep = (st) => L.staffBottom - (st - 30) * (L.g / 2);
+  function drawStaff(now) {
+    const fade = ctx.createLinearGradient(0, 0, W, 0);
+    fade.addColorStop(0, 'rgba(17,17,17,0)'); fade.addColorStop(0.06, C.staff);
+    fade.addColorStop(0.94, C.staff); fade.addColorStop(1, 'rgba(17,17,17,0)');
+    ctx.fillStyle = fade;
+    for (let i = 0; i < 5; i++) ctx.fillRect(0, Math.round(L.staffBottom - i * L.g), W, 1);
+    // a treble clef, drawn as text so it stays crisp
+    text('𝄞', 14, L.staffBottom + L.g * 0.9, L.g * 6.2, C.staff, 400);
+
+    const pps = L.ppb / BEAT;
+    const x = (t) => L.hitX + (t - viewT) * pps;
+    // where the next note gets written
+    ctx.save();
+    ctx.setLineDash([2, 5]); ctx.lineWidth = 1.5;
+    ctx.strokeStyle = sounding.size || now - keyAt < 0.3 ? C.hit : C.missed;
+    ctx.beginPath(); ctx.moveTo(L.hitX, L.floor + 8); ctx.lineTo(L.hitX, L.pianoTop - 4); ctx.stroke();
+    ctx.restore();
+
+    const rx = L.g * 0.68, ry = L.g * 0.5, stem = L.g * 3.4;
+    // the guide's next few notes, waiting to the right of the line in grey; the very next one in red
+    if (target() != null) {
+      for (let k = 0; k < 10 && gi + k < guide.length; k++) {
+        const m = guide[gi + k], st = stepOf(m), gx = L.hitX + 40 + k * rx * 6, gy = yOfStep(st);
+        if (gx > W - 20) break;
+        const col = k === 0 ? C.hit : '#c9c9c9';
+        ctx.fillStyle = '#d8d8d8';
+        for (let l = 28; l >= st && l <= 28; l -= 2) ctx.fillRect(gx - rx * 1.7, Math.round(yOfStep(l)), rx * 3.4, 1);
+        for (let l = 40; l <= st; l += 2) ctx.fillRect(gx - rx * 1.7, Math.round(yOfStep(l)), rx * 3.4, 1);
+        ctx.strokeStyle = col; ctx.lineWidth = 1.6;
+        ctx.beginPath(); ctx.ellipse(gx, gy, rx, ry, -0.35, 0, Math.PI * 2); ctx.stroke();
+        if (k === 0) { ctx.globalAlpha = 0.25 + 0.2 * Math.sin(now * 6); ctx.fillStyle = col; ctx.fill(); ctx.globalAlpha = 1; }
+        if (SHARP[m % 12]) text('♯', gx - rx * 2.6, gy + L.g * 0.45, L.g * 1.5, col, 500, 'center');
+      }
+    }
+    for (let i = 0; i < tape.length; i++) {
+      const n = tape[i], nx = x(n.t);
+      if (nx < -40 || nx > W + 40) continue;
+      const st = stepOf(n.m), y = yOfStep(st), v = valueOf(i);
+      const at = shownAt.get(i);
+      const pop = at ? Math.max(0, 1 - (now - at) * 4) : 0;
+      const on = [...sounding.values()].some((s0) => s0.i === i);
+      const col = (phase === 'replay' && i < rNext) || pop > 0 || on ? C.hit : C.ink;
+      const sc = 1 + pop * 0.25;
+      // ledger lines above and below the staff
+      ctx.fillStyle = C.staff;
+      for (let l = 28; l >= st && l <= 28; l -= 2) ctx.fillRect(nx - rx * 1.7, Math.round(yOfStep(l)), rx * 3.4, 1);
+      for (let l = 40; l <= st; l += 2) ctx.fillRect(nx - rx * 1.7, Math.round(yOfStep(l)), rx * 3.4, 1);
+      ctx.fillStyle = col; ctx.strokeStyle = col; ctx.lineWidth = Math.max(1.2, L.g * 0.12);
+      ctx.beginPath(); ctx.ellipse(nx, y, rx * sc, ry * sc, -0.35, 0, Math.PI * 2); ctx.fill();
+      if (v === 'half' || v === 'whole') {
+        ctx.save(); ctx.globalCompositeOperation = 'destination-out';
+        ctx.beginPath(); ctx.ellipse(nx, y, rx * sc * 0.55, ry * sc * 0.42, -0.35, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+      }
+      if (SHARP[n.m % 12]) text('♯', nx - rx * 2.6, y + L.g * 0.45, L.g * 1.5, col, 500, 'center');
+      if (v === 'whole') continue;
+      // stems go down from the middle line up, and up below it
+      const down = st >= 34;
+      const sx = down ? nx - rx * sc * 0.92 : nx + rx * sc * 0.92;
+      const sy = down ? y + stem : y - stem;
+      ctx.beginPath(); ctx.moveTo(sx, y); ctx.lineTo(sx, sy); ctx.stroke();
+      if (v === 'eighth') {
+        ctx.lineWidth = Math.max(1.2, L.g * 0.14);
+        const dir = down ? -1 : 1;
+        ctx.beginPath(); ctx.moveTo(sx, sy); ctx.quadraticCurveTo(sx + rx * 1.4, sy + dir * L.g, sx + rx * 1.2, sy + dir * L.g * 2.2); ctx.stroke();
+      }
+    }
+  }
+
+  const whiteMidi = (i) => 60 + Math.floor(i / 7) * 12 + [0, 2, 4, 5, 7, 9, 11][i % 7];
+  const blackKeys = () => { const out = []; for (let m = LOW; m <= HIGH; m++) if (SHARP[m % 12]) out.push(m); return out; };
+  const whiteIndex = (m) => Math.floor((m - 60) / 12) * 7 + LETTER[m % 12];
+  const blackX = (m) => (whiteIndex(m - 1) + 1) * L.keyW - L.keyW * 0.29;
+  function drawPiano(now) {
+    const top = L.pianoTop, kw = L.keyW, h = L.pianoH;
+    const down = new Set([...sounding.values()].map((s0) => tape[s0.i] && tape[s0.i].m));
+    // the red felt strip along the keys
+    ctx.fillStyle = C.ebony; ctx.fillRect(0, top - 6, W, 6);
+    ctx.fillStyle = C.accent; ctx.fillRect(0, top - 2, W, 2);
+    const small = Math.max(9, Math.min(13, kw * 0.22));
+    for (let i = 0; i < WHITE; i++) {
+      const m = whiteMidi(i), d = down.has(m);
+      ctx.fillStyle = d ? C['ivory-down'] : C.ivory;
+      ctx.fillRect(i * kw, top + (d ? 2 : 0), kw, h);
+      if (d) { ctx.fillStyle = 'rgba(196,22,28,0.16)'; ctx.fillRect(i * kw, top + 2, kw, h); }
+      ctx.fillStyle = C['ivory-edge'];
+      ctx.fillRect(Math.round(i * kw), top, 1, h);
+      if (LABEL[m]) text(LABEL[m], i * kw + kw / 2, top + h - Math.max(26, h * 0.2) + (d ? 2 : 0), small + 2, d ? C.hit : C.ink, 700, 'center');
+      text(NAMES[m % 12] + (Math.floor(m / 12) - 1), i * kw + kw / 2, top + h - Math.max(10, h * 0.07) + (d ? 2 : 0), small, 'rgba(0,0,0,0.4)', 500, 'center');
+    }
+    // black keys
+    const bw = kw * 0.58, bh = h * 0.6;
+    for (const m of blackKeys()) {
+      const bx = blackX(m), d = down.has(m);
+      ctx.fillStyle = d ? '#3a1416' : C.ebony; ctx.fillRect(bx, top, bw, bh + (d ? 2 : 0));
+      ctx.fillStyle = 'rgba(255,255,255,0.08)'; ctx.fillRect(bx + bw * 0.15, top, bw * 0.7, bh * 0.9);
+      if (LABEL[m]) text(LABEL[m], bx + bw / 2, top + bh - 10, small, d ? '#ff8a8a' : 'rgba(255,255,255,0.8)', 700, 'center');
+    }
+    ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.fillRect(0, top, W, 3);
+    // the key the guide wants next
+    const want = target();
+    if (want != null) {
+      const pulse = 0.55 + 0.45 * Math.sin(now * 6);
+      ctx.save();
+      ctx.strokeStyle = C.hit; ctx.lineWidth = 3; ctx.globalAlpha = pulse;
+      if (SHARP[want % 12]) { ctx.fillStyle = C.hit; ctx.globalAlpha = 0.35 + 0.35 * pulse; ctx.fillRect(blackX(want), top, bw, bh); }
+      else { const i = whiteIndex(want); ctx.strokeRect(i * kw + 2, top + 4, kw - 4, h - 6); }
+      ctx.restore();
+    }
+  }
+
+  function frame() {
+    const now = nowS();
+    tick(now);
+    ctx = screen;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    drawStage();
+    drawPiano(now);
+    drawStaff(now);
+    // the dancer alone, small and hard-edged, then blown up with no smoothing
+    ctx = inkCtx;
+    ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, ink.width, ink.height);
+    ctx.setTransform(1 / L.px, 0, 0, 1 / L.px, 0, 0);
+    drawDancer(now);
+    hardEdges();
+    screen.setTransform(1, 0, 0, 1, 0, 0);
+    screen.imageSmoothingEnabled = false;
+    screen.drawImage(ink, 0, 0, ink.width * L.px * dpr, ink.height * L.px * dpr);
+    ctx = screen;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    drawHud(now);
+    requestAnimationFrame(frame);
+  }
+
+  addEventListener('resize', resize);
+  resize();
+  cv.focus();
+  requestAnimationFrame(frame);
+
+  // for checking by hand: __rw.press() plays the key, __rw.pose(name) holds a pose
+  window.__rw = { get sounding() { return [...sounding.entries()].map(([k, v]) => k + ":" + v.i); }, press, release, replay: () => startReplay(nowS()), get tape() { return tape; }, get phase() { return phase; }, pose: (n) => { dancer.move = null; dancer.pose = clonePose(POSE[n]); }, dance: (n) => dance(n, nowS()) };
+})();
+</script>
+</body></html>

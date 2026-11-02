@@ -1,0 +1,306 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><style>body{margin:0;font:14px system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style></head><body>
+<title>하루 하나 만들기</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gowun+Dodum&display=swap">
+<style>
+  /* Layout: black table. Each week is a row of five plain white cards; a finished day gets a picture in its window. */
+  :root {
+    color-scheme: dark;
+    --table: #000000;
+    --mount: #ffffff;
+    --mount-ink: #111111;
+    --mount-soft: #8a8a8a;
+    --window-empty: #e6e6e6;
+    --ink: #f2f2f0;
+    --ink-soft: #8c8c8c;
+    --rule: #2b2b2b;
+
+    --thumb-night: #050506;
+    --thumb-fog: rgba(170, 174, 180, 0.35);
+    --thumb-petal: #f5f5f2;
+    --thumb-heart: #f2b840;
+    --thumb-stem: #6f8a69;
+    --thumb-sheet: #fce527;
+    --thumb-ink: #0a0a0a;
+    --thumb-red: #ff1e00;
+    --thumb-stage: #f3f3f1;
+    --thumb-line: #b5b5b5;
+    --thumb-note: #c4161c;
+    --thumb-card: #f3f3f1;
+    --o: #be8c6b; --v: #4ea530; --e: #fd5c28; --r: #b3ab01; --l: #426c9e; --a: #fc6ca9; --p: #f93571;
+
+    /* one face for everything, Hangul and Latin alike */
+    --font-display: "Gowun Dodum", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+    --font-body: var(--font-display);
+    --font-hand: var(--font-display);
+    --font-mono: var(--font-display);
+  }
+
+  * { font-synthesis: none; }
+  body {
+    background: var(--table);
+    color: var(--ink);
+    font: 400 15px/1.6 var(--font-body);
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding-block: clamp(28px, 6vw, 72px) 56px;
+  }
+  .wrap { max-width: 1160px; margin: 0 auto; display: flex; flex-direction: column; gap: clamp(36px, 6vw, 64px); }
+
+  /* ---------- weeks ---------- */
+  #weeks { display: flex; flex-direction: column; gap: clamp(40px, 6vw, 64px); }
+  .week { display: flex; flex-direction: column; gap: 18px; }
+  .week-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 18px; padding-bottom: 12px; border-bottom: 1px solid var(--rule); }
+  .week-no { font: 400 13px/1 var(--font-mono); letter-spacing: 0.1em; text-transform: uppercase; }
+  .week-range { font: 400 13px/1 var(--font-mono); color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+  .week-theme { margin: 0; font-weight: 400; }
+
+  .sheet { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: clamp(12px, 2vw, 22px); }
+  .slot { display: flex; flex-direction: column; gap: 12px; min-width: 0; color: inherit; text-decoration: none; }
+
+  .mount {
+    position: relative; aspect-ratio: 1 / 1; max-width: 100%;
+    background: var(--mount); color: var(--mount-ink);
+    display: grid; grid-template-rows: auto 1fr; padding: 10% 11% 8%; gap: 8%;
+    transition: transform 0.25s ease;
+  }
+  .window {
+    aspect-ratio: 3 / 2; overflow: hidden; background: var(--window-empty);
+    display: grid; place-items: center;
+  }
+  .window svg { width: 100%; height: 100%; display: block; }
+  .label { display: flex; align-items: center; justify-content: space-between; gap: 6px; min-width: 0; }
+  .label-title { font: 400 clamp(12px, 1.3vw, 16px)/1.5 var(--font-hand); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .code { font: 400 10px/1 var(--font-mono); letter-spacing: 0.08em; color: var(--mount-soft); flex: none; }
+
+
+  a.slot:hover .mount, a.slot:focus-visible .mount { transform: translateY(-4px); }
+  a.slot:focus-visible { outline: none; }
+  a.slot:focus-visible .mount { outline: 2px solid var(--ink); outline-offset: 4px; }
+
+  .slot.empty .label-title { color: var(--mount-soft); }
+  /* unfilled days keep the window's space so every card stays the same size, but show nothing in it */
+  .slot.empty .window { background: none; }
+
+
+  @media (max-width: 900px) {
+    .sheet {
+      grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(170px, 42%);
+      overflow-x: auto; scroll-snap-type: x mandatory; padding-bottom: 10px;
+      margin-inline: calc(-1 * max(16px, env(safe-area-inset-left, 0px))) calc(-1 * max(16px, env(safe-area-inset-right, 0px)));
+      padding-inline: max(16px, env(safe-area-inset-left, 0px)) max(16px, env(safe-area-inset-right, 0px));
+      scroll-padding-inline: max(16px, env(safe-area-inset-left, 0px));
+    }
+    .slot { scroll-snap-align: start; }
+    .label-title { font-size: 14px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .mount { transition: none; }
+  }
+</style>
+
+<div class="wrap">
+  <main id="weeks"></main>
+</div>
+
+<script>
+(() => {
+  /* ---------- the log: add one entry per finished day ---------- */
+  const WEEKS = [
+    { n: 1, monday: [2026, 10, 26], theme: '좋아하는 노래의 가사나 제목으로' },
+    { n: 2, monday: [2026, 11, 2], theme: '좋아하는 영화에서 영감받아' },
+    { n: 3, monday: [2026, 11, 9], theme: null },
+    { n: 4, monday: [2026, 11, 16], theme: null },
+  ];
+  const WORKS = {
+    '2026-10-26': {
+      title: 'Daisies',
+      credit: 'Justin Bieber · DAISIES',
+      note: '꽃잎을 떼면 가사가 한 줄씩, 줄기를 흔들면 꽃잎이 우수수',
+      url: './day01/',
+      thumb: 'daisies',
+    },
+    '2026-10-27': {
+      title: 'Kill Bill',
+      credit: 'SZA · Kill Bill',
+      note: '노란 종이를 드래그한 자리대로 찢으면 아래로 빨간 종이가',
+      url: './day02/',
+      thumb: 'killbill',
+    },
+    '2026-10-28': {
+      title: 'Runaway',
+      credit: 'Kanye West · Runaway',
+      note: '키보드로 피아노를 치면 픽셀 발레리나가 춤추고, 친 음이 악보로 남아요',
+      url: './day03/',
+      thumb: 'runaway',
+    },
+    '2026-10-29': {
+      title: 'Overlap',
+      credit: 'typography · overlap',
+      note: '글자가 랜덤 색 복사본과 세로·가로로 겹치고, 늘어나며 비틀려요',
+      url: './day04/',
+      thumb: 'overlap',
+    },
+    '2026-10-30': {
+      title: 'White Ferrari',
+      credit: 'Frank Ocean · White Ferrari',
+      note: '영어 단어를 쓰고 막대를 밀면 동글한 글자가 그 물건의 선 그림이 돼요',
+      url: './day05/',
+      thumb: 'wordblob',
+    },
+    '2026-11-02': {
+      title: 'Life Archive',
+      credit: '월터의 상상은 현실이 된다 · LIFE',
+      note: 'LIFE 1월호 책장을 옆으로 넘기고, 마지막 호 표지는 내 사진으로',
+      url: './day06/',
+      thumb: 'life',
+    },
+  };
+
+  /* ---------- little pictures for the slide windows ---------- */
+  const THUMBS = {
+    daisies() {
+      let petals = '';
+      for (let i = 0; i < 10; i++) {
+        petals += `<ellipse cx="0" cy="-12" rx="4.6" ry="10" transform="rotate(${i * 36})" style="fill:var(--thumb-petal)"/>`;
+      }
+      return `<svg viewBox="0 0 150 100" role="img" aria-label="안개 낀 검은 배경 위 데이지 한 송이">
+        <defs>
+          <radialGradient id="th-fog" cx="0.5" cy="1" r="0.8"><stop offset="0" style="stop-color:var(--thumb-fog)"/><stop offset="1" style="stop-color:var(--thumb-night);stop-opacity:0"/></radialGradient>
+          <filter id="th-soft" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="0.7"/></filter>
+          <filter id="th-far" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="2.4"/></filter>
+        </defs>
+        <rect width="150" height="100" style="fill:var(--thumb-night)"/>
+        <rect width="150" height="100" fill="url(#th-fog)"/>
+        <g filter="url(#th-far)" opacity="0.35">
+          <circle cx="28" cy="40" r="7" style="fill:var(--thumb-petal)"/><circle cx="122" cy="52" r="6" style="fill:var(--thumb-petal)"/><circle cx="100" cy="26" r="5" style="fill:var(--thumb-petal)"/>
+        </g>
+        <path d="M80,104 C78,86 84,66 80,48" fill="none" style="stroke:var(--thumb-stem)" stroke-width="1.6"/>
+        <g transform="translate(80 46)" filter="url(#th-soft)">${petals}<circle r="5" style="fill:var(--thumb-heart)"/></g>
+        <circle cx="136" cy="13" r="7" style="fill:var(--thumb-night);stroke:var(--thumb-fog)" stroke-width="0.8"/>
+      </svg>`;
+    },
+    killbill() {
+      // the user's own card art, redrawn as shapes: three black headline bars, the side stripe, one red slash
+      return `<svg viewBox="0 0 1443 812" preserveAspectRatio="none" role="img" aria-label="노란 바탕에 검은 막대 세 개와 오른쪽 검은 띠, 그 위를 가로지르는 빨간 사선">
+        <rect width="1443" height="812" style="fill:var(--thumb-sheet)"/>
+        <rect x="37" y="32" width="621" height="194" style="fill:var(--thumb-ink)"/>
+        <rect x="37" y="252" width="323" height="194" style="fill:var(--thumb-ink)"/>
+        <rect x="37" y="468" width="515" height="194" style="fill:var(--thumb-ink)"/>
+        <rect x="1275" y="0" width="135" height="812" style="fill:var(--thumb-ink)"/>
+        <polygon points="232,812 295,812 1325,0 1262,0" style="fill:var(--thumb-red)"/>
+      </svg>`;
+    },
+    runaway() {
+      // the dancer stays in hard pixels; the staff below her is drawn plain
+      let lines = '';
+      for (let i = 0; i < 5; i++) lines += `<rect x="0" y="${66 + i * 5}" width="150" height="0.6" style="fill:var(--thumb-line)"/>`;
+      const notes = [[22, 86, 'ink'], [40, 81, 'ink'], [58, 78.5, 'ink'], [98, 73.5, 'note'], [116, 76, 'ink'], [134, 71, 'ink']]
+        .map(([x, y, c]) => `<ellipse cx="${x}" cy="${y}" rx="3" ry="2.2" transform="rotate(-20 ${x} ${y})" style="fill:var(--thumb-${c === 'note' ? 'note' : 'ink'})"/><rect x="${x - 2.8}" y="${y}" width="0.7" height="13" style="fill:var(--thumb-${c === 'note' ? 'note' : 'ink'})"/>`).join('');
+      return `<svg viewBox="0 0 150 100" role="img" aria-label="흰 무대 위 픽셀 발레리나와 그 아래 음표가 놓인 오선">
+        <rect width="150" height="100" style="fill:var(--thumb-stage)"/>
+        ${lines}${notes}
+        <g style="fill:var(--thumb-ink)" shape-rendering="crispEdges"><rect x="76.0" y="10.0" width="2.6" height="2.6"/><rect x="73.4" y="12.6" width="2.6" height="2.6"/><rect x="60.4" y="15.2" width="5.2" height="2.6"/><rect x="70.8" y="15.2" width="2.6" height="2.6"/><rect x="57.8" y="17.8" width="10.4" height="2.6"/><rect x="70.8" y="17.8" width="2.6" height="2.6"/><rect x="60.4" y="20.4" width="10.4" height="2.6"/><rect x="55.2" y="23.0" width="2.6" height="2.6"/><rect x="63.0" y="23.0" width="5.2" height="2.6"/><rect x="52.6" y="25.6" width="2.6" height="2.6"/><rect x="63.0" y="25.6" width="5.2" height="2.6"/><rect x="50.0" y="28.2" width="2.6" height="2.6"/><rect x="63.0" y="28.2" width="5.2" height="2.6"/><rect x="63.0" y="30.8" width="5.2" height="2.6"/><rect x="55.2" y="33.4" width="26.0" height="2.6"/><rect x="52.6" y="36.0" width="31.2" height="2.6"/><rect x="55.2" y="38.6" width="26.0" height="2.6"/><rect x="60.4" y="41.2" width="15.6" height="2.6"/><rect x="63.0" y="43.8" width="10.4" height="2.6"/><rect x="65.6" y="46.4" width="5.2" height="2.6"/><rect x="65.6" y="49.0" width="5.2" height="2.6"/><rect x="65.6" y="51.6" width="5.2" height="2.6"/><rect x="65.6" y="54.2" width="2.6" height="2.6"/><rect x="65.6" y="56.8" width="2.6" height="2.6"/></g>
+      </svg>`;
+    },
+    overlap() {
+      // the word as designed, with a few randomly coloured copies stacked up and down its columns behind it
+      const G = [
+        ['o', 'M70.3673 131.725C74.1887 131.725 77.4302 133.001 80.0763 135.555C82.7377 138.123 84.0489 141.886 84.0489 146.797C84.0489 151.543 82.8941 155.486 80.5665 158.608C78.2187 161.757 74.5828 163.313 69.713 163.313C65.636 163.313 62.3758 161.935 59.961 159.167V159.166C57.5506 156.385 56.3575 152.671 56.3575 148.05C56.3575 143.103 57.6133 139.134 60.1505 136.171C62.6914 133.204 66.1065 131.725 70.3673 131.725ZM70.2306 136.502C67.3084 136.502 65.2172 137.611 63.9063 139.814C62.5717 142.056 61.8986 144.77 61.8985 147.968C61.8985 151.038 62.5711 153.575 63.9005 155.596C65.207 157.582 67.2805 158.589 70.1759 158.589C71.7709 158.589 73.0965 158.289 74.1632 157.701C75.2272 157.115 76.0485 156.234 76.6271 155.051L76.8448 154.591C77.8983 152.279 78.4269 149.727 78.4269 146.933C78.4268 144.401 78.047 142.333 77.3009 140.716L77.1466 140.399C76.4762 139.093 75.5685 138.123 74.4259 137.478C73.2816 136.831 71.8866 136.502 70.2306 136.502Z'],
+        ['v', 'M92.2362 132.569L92.2919 132.741L99.8515 155.791L107.757 132.738L107.815 132.569H113.723L113.595 132.907L102.588 162.088L102.526 162.25H96.9482L96.8876 162.086L86.1259 132.906L86.0019 132.569H92.2362Z'],
+        ['e', 'M129.708 131.916C131.82 131.916 133.865 132.416 135.841 133.413L136.206 133.6C138.005 134.553 139.399 135.771 140.379 137.258L140.563 137.543C141.462 138.979 142.066 140.631 142.377 142.494L142.482 143.045C142.708 144.419 142.819 146.4 142.819 148.976V149.226H121.442C121.563 152.032 122.248 154.273 123.48 155.967L123.722 156.276C124.974 157.772 126.838 158.535 129.355 158.535C131.855 158.535 133.827 157.713 135.299 156.083C136.145 155.132 136.744 154.031 137.097 152.778L137.149 152.595H142.442L142.409 152.875C142.277 153.988 141.835 155.217 141.099 156.56C140.381 157.886 139.566 158.982 138.653 159.839C137.128 161.325 135.244 162.326 133.007 162.843C131.804 163.139 130.449 163.286 128.946 163.286C125.36 163.286 122.298 162.023 119.772 159.505L119.529 159.257C116.948 156.546 115.672 152.772 115.672 147.968C115.672 143.235 116.958 139.367 119.548 136.388C122.142 133.406 125.536 131.916 129.708 131.916ZM129.41 136.693C127.226 136.693 125.402 137.482 123.924 139.066L123.923 139.067C122.497 140.578 121.715 142.494 121.581 144.831H137.248C137.038 142.855 136.594 141.285 135.922 140.109H135.921C134.629 137.839 132.479 136.693 129.41 136.693Z'],
+        ['r', 'M163.199 137.78L162.903 137.724C162.621 137.671 162.358 137.636 162.114 137.619H162.112C161.884 137.601 161.627 137.592 161.342 137.592C158.93 137.592 157.109 138.37 155.84 139.9L155.839 139.901C154.551 141.436 153.908 143.204 153.908 145.216V162.25H148.504V132.57H153.663V136.838C154.18 136.023 154.979 135.112 156.048 134.109C157.581 132.651 159.358 131.916 161.369 131.916C161.471 131.916 161.635 131.926 161.852 131.944C162.073 131.962 162.448 131.999 162.975 132.053L163.199 132.077V137.78Z'],
+        ['l', 'M172.49 121.725V162.25H167.086V121.725H172.49Z'],
+        ['a', 'M191.067 131.861C194.313 131.861 197.011 132.44 199.143 133.616L199.562 133.859V133.86C201.77 135.219 202.87 137.339 202.87 140.176V156.987C202.87 157.46 202.961 157.814 203.124 158.069L203.186 158.142C203.356 158.309 203.683 158.426 204.255 158.426C204.464 158.426 204.702 158.417 204.967 158.399C205.233 158.364 205.516 158.32 205.818 158.266L206.112 158.215V162.325L205.93 162.377C205.165 162.595 204.57 162.736 204.152 162.793C203.736 162.849 203.178 162.877 202.483 162.877C200.727 162.877 199.412 162.248 198.594 160.963L198.593 160.962C198.236 160.393 197.976 159.641 197.803 158.717C196.803 159.878 195.457 160.891 193.77 161.759C191.861 162.742 189.76 163.231 187.47 163.231C184.71 163.231 182.429 162.395 180.651 160.711L180.649 160.709C178.891 159.007 178.011 156.878 178.011 154.343C178.011 151.581 178.876 149.408 180.63 147.862C182.364 146.333 184.631 145.4 187.412 145.051L195.231 144.069L195.426 144.04C196.381 143.876 196.985 143.45 197.298 142.793L197.3 142.789C197.493 142.404 197.601 141.822 197.601 141.02C197.601 139.417 197.032 138.299 195.921 137.609L195.918 137.607C194.794 136.881 193.151 136.503 190.958 136.503C188.437 136.503 186.712 137.182 185.707 138.476L185.706 138.477C185.146 139.189 184.765 140.273 184.586 141.759L184.559 141.979H179.504L179.51 141.722C179.6 138.19 180.712 135.646 182.9 134.165L183.115 134.024C185.411 132.58 188.065 131.861 191.067 131.861ZM197.465 147.584C196.907 147.883 196.239 148.137 195.464 148.345C194.51 148.603 193.571 148.786 192.651 148.896L192.652 148.897L189.682 149.278C187.914 149.513 186.617 149.88 185.769 150.365L185.768 150.366C184.346 151.171 183.633 152.446 183.633 154.235C183.633 155.582 184.121 156.624 185.091 157.39C186.079 158.17 187.25 158.562 188.615 158.562C190.3 158.562 191.933 158.172 193.517 157.389L193.519 157.388C194.847 156.742 195.83 155.897 196.482 154.858C197.134 153.819 197.465 152.57 197.465 151.101V147.584Z'],
+        ['p', 'M224.116 131.861C227.495 131.861 230.368 133.164 232.72 135.757C235.082 138.342 236.246 142.026 236.246 146.769C236.246 153.165 234.573 157.794 231.168 160.586C229.015 162.349 226.507 163.231 223.653 163.231C221.419 163.231 219.525 162.741 217.986 161.747V161.746C217.207 161.258 216.364 160.479 215.457 159.421V173.884H210.053V132.706H215.321V136.097C216.194 135.026 217.137 134.169 218.153 133.534C219.851 132.416 221.842 131.861 224.116 131.861ZM222.999 136.666C221.344 136.666 219.968 137.079 218.855 137.891C217.742 138.705 216.873 139.933 216.259 141.597C215.6 143.377 215.267 145.652 215.267 148.431C215.267 150.521 215.559 152.305 216.136 153.79L216.255 154.083V154.084C216.875 155.553 217.744 156.641 218.857 157.363C219.971 158.085 221.348 158.453 222.999 158.453C225.206 158.453 227.034 157.539 228.498 155.687L228.767 155.327C230.066 153.47 230.732 150.784 230.732 147.233C230.732 144.931 230.399 142.966 229.742 141.332V141.331C229.121 139.759 228.248 138.597 227.135 137.827C226.022 137.057 224.647 136.666 222.999 136.666Z']
+      ];
+      const copies = [
+        ['o', -14, '#8fd3c9'], ['o', 12, '#c9a0f0'], ['v', 18, '#f7a1b5'], ['v', 34, '#6aa9f5'], ['e', -12, '#b7e36b'],
+        ['e', 14, '#ffb65c'], ['r', -20, '#7e8ef0'], ['l', -18, '#f0e05a'], ['l', 10, '#e66db5'], ['a', 16, '#64d6a0'], ['p', -16, '#ffd1a3'],
+      ];
+      const d = Object.fromEntries(G);
+      const back = copies.map(([c, dy, col]) => `<path d="${d[c]}" transform="translate(0 ${dy})" fill="${col}" stroke="#000" stroke-width="0.5"/>`).join('');
+      const front = G.map(([c, path]) => `<path d="${path}" style="fill:var(--${c})" stroke="#000" stroke-width="0.5"/>`).join('');
+      return `<svg viewBox="46 96 200 133" role="img" aria-label="흰 카드 위 overlap, 뒤로 여러 색 복사본이 위아래로 겹쳐 있음">
+        <rect x="0" y="0" width="300" height="300" style="fill:var(--thumb-card)"/>${back}${front}
+      </svg>`;
+    },
+    life() {
+      // a shelf of LIFE spines against a mountain dusk, one issue turned to its cover
+      let spines = '';
+      const ws = [9, 7, 10, 8, 9, 7, 8, 10, 7, 9, 8];
+      let x = 6;
+      ws.forEach((w, i) => {
+        if (i === 6) { spines += `<rect x="${x}" y="30" width="34" height="56" fill="#2b2b2e"/><rect x="${x}" y="30" width="14" height="8" fill="#d7262c"/><ellipse cx="${x + 17}" cy="58" rx="8" ry="11" fill="#8a8a8a"/><rect x="${x + 6}" y="66" width="22" height="20" fill="#5a5a5a"/><rect x="${x}" y="82" width="34" height="4" fill="#d7262c"/>`; x += 36; }
+        spines += `<rect x="${x}" y="32" width="${w}" height="54" fill="${i % 4 === 1 ? '#e9e3d6' : '#f3efe6'}"/><rect x="${x + 1}" y="34" width="${w - 2}" height="4" fill="#d7262c"/>`;
+        x += w + 1.5;
+      });
+      return `<svg viewBox="0 0 150 100" role="img" aria-label="산 노을을 배경으로 LIFE 책등이 늘어선 책장, 한 권은 표지가 보임">
+        <defs><linearGradient id="th-dusk" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3f6273"/><stop offset="0.7" stop-color="#c9a27a"/><stop offset="1" stop-color="#e9b46a"/></linearGradient></defs>
+        <rect width="150" height="100" fill="url(#th-dusk)"/>
+        <path d="M0 70 L40 40 L62 58 L98 18 L150 66 L150 100 L0 100 Z" fill="#8a5a40" opacity="0.8"/>
+        <rect y="86" width="150" height="14" fill="#2c2a33"/>
+        ${spines}
+      </svg>`;
+    },
+    wordblob() {
+      // the sports car from the picture book: white body, black pen line
+      return `<svg viewBox="9 52 1000 667" role="img" aria-label="흰 바탕에 검은 선으로 그린 스포츠카 한 대">
+        <rect x="0" y="0" width="1100" height="800" style="fill:var(--thumb-card)"/>
+        <g fill="#fff" stroke="#000" stroke-width="7" stroke-linejoin="round" stroke-linecap="round">
+          <circle cx="250" cy="468" r="72"/><circle cx="790" cy="468" r="72"/>
+          <path d="M60 420 C60 372 102 348 172 338 L330 322 C392 272 470 236 560 233 C642 230 702 252 762 302 L882 322 C932 332 958 362 958 402 L958 440 C958 460 942 470 922 470 L82 470 C66 470 60 456 60 440 Z"/>
+          <path d="M382 320 C432 282 492 264 556 264 C602 264 642 277 682 307 L672 320 Z"/>
+          <circle cx="250" cy="468" r="30"/><circle cx="790" cy="468" r="30"/>
+          <ellipse cx="915" cy="372" rx="18" ry="11"/>
+          <path d="M560 330 L560 425 M360 424 L700 424" fill="none"/>
+        </g>
+      </svg>`;
+    },
+  };
+
+  /* ---------- build the sheet ---------- */
+  const pad = (n) => String(n).padStart(2, '0');
+  const slots = [];
+  WEEKS.forEach((w) => {
+    for (let i = 0; i < 5; i++) {
+      const d = new Date(Date.UTC(w.monday[0], w.monday[1] - 1, w.monday[2] + i));
+      const key = `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
+      slots.push({ week: w.n, i, key, mmdd: `${pad(d.getUTCMonth() + 1)}.${pad(d.getUTCDate())}`, work: WORKS[key] || null });
+    }
+  });
+
+  const $ = (id) => document.getElementById(id);
+
+  const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const slotHtml = (s, n) => {
+    const code = `D${pad(n + 1)}`;
+    if (s.work) {
+      const w = s.work;
+      const pic = THUMBS[w.thumb] ? THUMBS[w.thumb]() : '';
+      return `<a class="slot" href="${esc(w.url)}">
+        <div class="mount"><div class="window">${pic}</div>
+          <div class="label"><span class="label-title">${esc(w.title)}</span><span class="code">${code}</span></div></div>
+      </a>`;
+    }
+    return `<div class="slot empty">
+      <div class="mount"><div class="window"></div>
+        <div class="label"><span class="label-title">untitled</span><span class="code">${code}</span></div></div>
+    </div>`;
+  };
+
+  $('weeks').innerHTML = WEEKS.map((w) => {
+    const items = slots.filter((s) => s.week === w.n);
+    const range = `${items[0].mmdd} – ${items[4].mmdd}`;
+    const theme = w.theme ? `<p class="week-theme">${esc(w.theme)}</p>` : '';
+    return `<section class="week" aria-label="${w.n}주차">
+      <div class="week-head"><span class="week-no">Week ${w.n}</span><span class="week-range">${range}</span>${theme}</div>
+      <div class="sheet">${items.map((s) => slotHtml(s, slots.indexOf(s))).join('')}</div>
+    </section>`;
+  }).join('');
+})();
+</script>
+
+</body></html>
