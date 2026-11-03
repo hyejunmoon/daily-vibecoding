@@ -157,6 +157,13 @@
       url: './day06/',
       thumb: 'life',
     },
+    '2026-11-03': {
+      title: 'Bon Appétit',
+      credit: '라따뚜이 · Ratatouille',
+      note: '재료를 누르면 그 맛의 소리와 색이 퍼지고, 다 맛보면 레미가 나타나요',
+      url: './day07/',
+      thumb: 'bonappetit',
+    },
   };
 
   /* ---------- little pictures for the slide windows ---------- */
@@ -225,6 +232,21 @@
       const front = G.map(([c, path]) => `<path d="${path}" style="fill:var(--${c})" stroke="#000" stroke-width="0.5"/>`).join('');
       return `<svg viewBox="46 96 200 133" role="img" aria-label="흰 카드 위 overlap, 뒤로 여러 색 복사본이 위아래로 겹쳐 있음">
         <rect x="0" y="0" width="300" height="300" style="fill:var(--thumb-card)"/>${back}${front}
+      </svg>`;
+    },
+    bonappetit() {
+      // the plate in the dark with a few tastes glowing around it
+      return `<svg viewBox="0 0 150 100" role="img" aria-label="검은 배경 가운데 라따뚜이 접시와 주변에 퍼진 색 빛망울">
+        <defs><radialGradient id="th-bk" cx="0.5" cy="0.5" r="0.5"><stop offset="0" stop-color="#f2a922" stop-opacity="0.8"/><stop offset="1" stop-color="#f2a922" stop-opacity="0"/></radialGradient>
+        <radialGradient id="th-bk2" cx="0.5" cy="0.5" r="0.5"><stop offset="0" stop-color="#3e9b4f" stop-opacity="0.7"/><stop offset="1" stop-color="#3e9b4f" stop-opacity="0"/></radialGradient></defs>
+        <rect width="150" height="100" fill="#0b0908"/>
+        <circle cx="28" cy="26" r="18" fill="url(#th-bk)"/><circle cx="124" cy="72" r="16" fill="url(#th-bk2)"/>
+        <circle cx="120" cy="22" r="7" fill="none" stroke="#e8392b" stroke-width="2"/><circle cx="30" cy="78" r="4" fill="#8e3b76"/>
+        <path d="M108 50 q6 -10 12 0 t12 0" fill="none" stroke="#f4c430" stroke-width="2" stroke-linecap="round"/>
+        <ellipse cx="75" cy="58" rx="30" ry="12" fill="none" stroke="#f2a922" stroke-width="3"/>
+        <rect x="58" y="36" width="34" height="22" rx="8" fill="#e8392b"/>
+        <path d="M58 44 q17 10 34 0" fill="none" stroke="#f4c430" stroke-width="3"/><path d="M58 50 q17 8 34 0" fill="none" stroke="#3f7d2c" stroke-width="2"/>
+        <ellipse cx="75" cy="36" rx="17" ry="6" fill="#f25a32"/>
       </svg>`;
     },
     life() {
