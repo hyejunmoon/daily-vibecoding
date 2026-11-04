@@ -164,6 +164,13 @@
       url: './day07/',
       thumb: 'bonappetit',
     },
+    '2026-11-04': {
+      title: 'Midnight in Paris',
+      credit: '미드나잇 인 파리 · Midnight in Paris',
+      note: '거장들이 드나들던 파리의 가게를 누르면 로드뷰로, 하늘은 파리의 시간과 날씨를 따라요',
+      url: './day08/',
+      thumb: 'paris',
+    },
   };
 
   /* ---------- little pictures for the slide windows ---------- */
@@ -232,6 +239,20 @@
       const front = G.map(([c, path]) => `<path d="${path}" style="fill:var(--${c})" stroke="#000" stroke-width="0.5"/>`).join('');
       return `<svg viewBox="46 96 200 133" role="img" aria-label="흰 카드 위 overlap, 뒤로 여러 색 복사본이 위아래로 겹쳐 있음">
         <rect x="0" y="0" width="300" height="300" style="fill:var(--thumb-card)"/>${back}${front}
+      </svg>`;
+    },
+    paris() {
+      // the cut-out Paris sheet on a starry swirl, with a few buildings standing up
+      return `<svg viewBox="0 0 150 100" role="img" aria-label="별이 빛나는 밤 소용돌이 위에 순환도로 모양으로 오린 파리 지도와 세워진 건물들">
+        <rect width="150" height="100" fill="#1b2c5c"/>
+        <path d="M0 22 q20 -12 40 0 t40 0 t40 0 t40 0" fill="none" stroke="#6f8fd0" stroke-width="3" opacity=".6"/>
+        <circle cx="22" cy="14" r="6" fill="#f6d24a" opacity=".85"/><circle cx="122" cy="12" r="4" fill="#f6d24a" opacity=".8"/>
+        <path d="M18 66 Q20 42 48 36 Q75 28 104 36 Q132 44 132 66 Q128 88 96 92 Q70 96 44 90 Q16 84 18 66 Z" fill="#e8cf86" stroke="#2f5a37" stroke-width="2"/>
+        <path d="M24 70 Q50 56 74 64 T128 60" fill="none" stroke="#86a9d8" stroke-width="4"/>
+        <path d="M30 52 L120 78 M40 84 L110 42 M75 36 L72 94" stroke="#fffaf0" stroke-width="1.4"/>
+        <rect x="60" y="44" width="12" height="16" fill="#ecd7a8" stroke="#5a3e1b"/><path d="M58 46 L66 38 L74 46 Z" fill="#d8b97a" stroke="#5a3e1b"/>
+        <rect x="80" y="48" width="10" height="13" fill="#ecd7a8" stroke="#5a3e1b"/><rect x="80" y="48" width="10" height="3" fill="#b3261e"/>
+        <rect x="70" y="26" width="5" height="12" fill="#ecd7a8" stroke="#5a3e1b"/><path d="M66 24 l12 8 M78 24 l-12 8" stroke="#b3261e" stroke-width="2"/>
       </svg>`;
     },
     bonappetit() {
