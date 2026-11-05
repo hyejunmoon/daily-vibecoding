@@ -10,7 +10,7 @@
 </style>
 
 
-<canvas id="c" aria-label="시드는 튤립과 거꾸로 젊어지는 튤립, 찻잔, 민들레, 촛불, 편지, 회중시계. 용두를 돌리면 시간이 거꾸로 흐릅니다."></canvas>
+<canvas id="c" aria-label="나란히 놓인 두 튤립. 하나는 시들고 하나는 거꾸로 젊어집니다. 화면을 드래그하면 시간이 거꾸로 흐릅니다."></canvas>
 <script>
 (() => {
   // ---------- helpers ----------
@@ -479,18 +479,12 @@
     const st = PLANTS.map(pl => { const Lp = { head: [], back: L.back, front: L.front, falling: L.falling }; const r = plantLists(pl, tt, Lp); heads.push(Lp.head); return r; });
     const paint = list => list.sort((a, b) => a.z - b.z).forEach(it => drawItem(g, it));
     paint(L.back);
-    drawCandle(g, tt, now);
     PLANTS.forEach((pl, i) => drawStem(g, st[i].P, sm(.35, 1, Math.max(0, st[i].tau))));
     PLANTS.forEach((pl, i) => drawVase(g, cx + pl.off * U, st[i].tau));
     PLANTS.forEach((pl, i) => LEAF.forEach(lf => drawLeaf(g, pl, lf, st[i].P, st[i].tau)));
-    drawDandelion(g, tt);
     heads.forEach(paint);
-    drawWatch(g, tt);
-    drawLetter(g, tt);
     paint(L.front);
-    drawCup(g, tt, now);
     paint(L.falling);
-    drawFlyingSeeds(g, tt);
   }
 
   function render(now) {
@@ -498,7 +492,6 @@
     ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
     ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, cv.width, cv.height);
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-    candleGlow(ctx, t);
     // cast shadow: short to the right in the morning, long to the left at dusk
     sx.globalCompositeOperation = 'source-over'; sx.clearRect(0, 0, sh.width, sh.height); sx.drawImage(fl, 0, 0, sh.width, sh.height);
     sx.globalCompositeOperation = 'source-in'; sx.fillStyle = 'rgb(70,50,34)'; sx.fillRect(0, 0, sh.width, sh.height);
@@ -511,7 +504,7 @@
     W = innerWidth; H = innerHeight; DPR = Math.min(2, devicePixelRatio || 1);
     for (const c of [cv, fl]) { c.width = Math.round(W * DPR); c.height = Math.round(H * DPR); }
     sh.width = Math.ceil(W / 5); sh.height = Math.ceil(H / 5);
-    U = Math.min(H / 11.2, W / 14.4); cx = W / 2 + .1 * U; Gy = Math.min(H - 1.7 * U, H / 2 + 4.6 * U);
+    U = Math.min(H / 11.2, W / 9.8); cx = W / 2; Gy = Math.min(H - 1.7 * U, H / 2 + 4.6 * U);
     Rw = .95 * U; wxc = cx - 4.3 * U; wyc = Gy - Rw - .02 * U;
     makeCup(); makeLetter();
   }
@@ -545,8 +538,6 @@
   }
   // events on the timeline: forward plays the sound, rewinding plays it backwards
   const EVENTS = [
-    { at: T_LIGHT, snd: 'strike', vol: .5 }, { at: T_OUT, snd: 'puff', vol: .5 },
-    { at: T_BREAK, snd: 'crash', vol: .7 }, { at: T_BURN + .01, snd: 'crackle', vol: .6 },
   ];
   PLANTS[0].pet.forEach(p => EVENTS.push({ at: p.td + FD, snd: 'tok', vol: .35 }));
   // Benjamin's petals leave the table as time runs forward, so his landings sound backwards
@@ -561,7 +552,7 @@
 
   // ---------- winding the crown ----------
   let dragging = false, lastX = 0, lastY = 0, clickAcc = 0, wound = 0, tickAcc = 0;
-  const onCrown = (x, y) => Math.abs(x - wxc) < Math.max(.6 * Rw, 36) && Math.abs(y - crownY()) < Math.max(.45 * Rw, 30);
+  const onCrown = () => true; // the whole page is the crown now
   function setT(v) { const a = t; t = clamp(v, 0, 1); events(a, t); }
   function wind(amt, dir) {
     if (amt <= 0) return;
