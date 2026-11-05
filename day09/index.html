@@ -1,11 +1,8 @@
 <!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><style>body{margin:0;font:14px system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style></head><body><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>The Curious Case</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=IM+Fell+English:ital@0;1&family=IM+Fell+English+SC&family=Gowun+Batang&display=swap" rel="stylesheet">
 <style>
-  :root { --paper: #efe6d2; }
+  :root { --paper: #ffffff; }
   html, body { margin: 0; height: 100%; background: var(--paper); overflow: hidden; }
   canvas { display: block; position: fixed; inset: 0; width: 100%; height: 100%; touch-action: none; }
   body.grab canvas { cursor: grab; }
@@ -13,7 +10,7 @@
 </style>
 
 
-<canvas id="c" aria-label="시들어가는 튤립과 회중시계. 용두를 돌리면 시간이 거꾸로 흐릅니다."></canvas>
+<canvas id="c" aria-label="시드는 튤립과 거꾸로 젊어지는 튤립, 찻잔, 민들레, 촛불, 편지, 회중시계. 용두를 돌리면 시간이 거꾸로 흐릅니다."></canvas>
 <script>
 (() => {
   // ---------- helpers ----------
@@ -34,56 +31,69 @@
 
   // ---------- canvases ----------
   const cv = document.getElementById('c'), ctx = cv.getContext('2d');
-  const fl = document.createElement('canvas'), fx = fl.getContext('2d');   // flower, vase, watch
+  const fl = document.createElement('canvas'), fx = fl.getContext('2d');   // the still life
   const sh = document.createElement('canvas'), sx = sh.getContext('2d');   // its soft shadow
-  const lp = document.createElement('canvas'), lx = lp.getContext('2d');   // window light
-  const bg = document.createElement('canvas'), bx = bg.getContext('2d');   // paper
-  const fox = document.createElement('canvas'), ox = fox.getContext('2d'); // age spots
-  let W, H, DPR, U, cx, Gy, wxc, wyc, Rw, frame, grainPat;
+  const cupC = document.createElement('canvas'), cupX = cupC.getContext('2d');
+  const letC = document.createElement('canvas'), letX = letC.getContext('2d');
+  let W, H, DPR, U, cx, Gy, wxc, wyc, Rw;
 
-  // ---------- the story clock: t = 0 fresh spring morning, t = 1 withered autumn dusk ----------
+  // ---------- the story clock ----------
+  // t = 0 spring morning, t = 1 autumn dusk. Everything on screen is a pure function of t,
+  // so winding the crown backwards replays every moment in reverse.
   let t = 0, hold = false;
-  const RATE = 1 / 85;                       // seconds to wilt fully: 85
-  const START = Date.UTC(1918, 2, 21), SPAN = 245; // 21 March → 21 November 1918
+  const RATE = 1 / 40;
+  const MEET = .35; // the one moment both tulips are the same age
 
-  // ---------- flower model ----------
-  const PET = [0, 1, 2, 3, 4, 5].map(i => ({
-    outer: i % 2 === 0, phi: (i * 60 + 18) * RAD, j: (rnd() - .5) * .06, tw: (rnd() - .5) * .7, rf: rnd() * 6,
-    td: [.60, .81, .68, .87, .75, .92][i],
-    land: [[2.5, .22], [-1.45, .3], [1.55, -.14], [2.05, .4], [3.2, .06], [.95, .34]][i],
-    spin: [1.7, -2.2, 2.4, -1.4, 1.9, -2.6][i],
-  }));
-  const FD = .045, NU = 12, NV = 6;
+  // ---------- tulips ----------
+  const NU = 12, NV = 6, FD = .045;
   const E = .32, cE = Math.cos(E), sE = Math.sin(E), VIEW = [0, sE, cE], LIGHT = norm([-.45, .75, .5]);
-  const COL = {
-    inB: hex('#f3dc8e'), inBody: hex('#e5596c'), outB: hex('#c8cf84'), outBody: hex('#c22f49'),
-    edge: hex('#f09aa2'), aged: hex('#9f625a'), dry: hex('#6d4a3b'),
-  };
+  function makePetals(s, td, land) {
+    seed = s;
+    return [0, 1, 2, 3, 4, 5].map(i => ({
+      outer: i % 2 === 0, phi: (i * 60 + 18) * RAD, j: (rnd() - .5) * .06, tw: (rnd() - .5) * .7, rf: rnd() * 6,
+      td: td[i], land: land[i], spin: [1.7, -2.2, 2.4, -1.4, 1.9, -2.6][i],
+    }));
+  }
+  const PLANTS = [
+    { // Daisy: ages the usual way, red
+      off: -1.35, dir: -1, tau: tt => tt, ink: [112, 28, 46],
+      col: { inB: hex('#f3dc8e'), inBody: hex('#e5596c'), outB: hex('#c8cf84'), outBody: hex('#c22f49'), edge: hex('#f09aa2'), aged: hex('#9f625a'), dry: hex('#6d4a3b') },
+      pet: makePetals(1918, [.60, .81, .68, .87, .75, .92], [[1.6, .2], [2.4, .32], [1.1, -.12], [2.0, .42], [2.9, .08], [.9, .36]]),
+    },
+    { // Benjamin: born old and grows young, cream-yellow
+      off: 1.35, dir: 1, tau: tt => 1 - tt * (1 - MEET) / MEET * 1, ink: [120, 88, 28],
+      col: { inB: hex('#f9f0c4'), inBody: hex('#f3d468'), outB: hex('#d8dc98'), outBody: hex('#e4b23f'), edge: hex('#fbf1c6'), aged: hex('#a88a52'), dry: hex('#6f5a3c') },
+      pet: makePetals(2008, [.62, .83, .7, .88, .77, .93], [[1.4, .22], [2.3, .3], [1.0, -.12], [2.0, .4], [2.8, .06], [.8, .34]]),
+    },
+  ];
+  // Benjamin's tau runs 1 → MEET at t = MEET, then on into a bud below zero
+  PLANTS[1].tau = tt => 1 - tt * (1 - MEET) / MEET;
+  const budOf = tau => clamp(-tau / .86, 0, 1);
+  const leanAt = tt => Math.exp(-(((tt - MEET) / .075) ** 2));
 
-  function stemCtl(tt) {
-    const d = sm(.36, .95, tt) * .85;
-    return [[cx, Gy - .45 * U], [cx - .02 * U, Gy - 4.3 * U],
-      [cx + lerp(.12, 1.25, d) * U, Gy - lerp(6.5, 7.55, d) * U],
-      [cx + lerp(.05, 2.15, d) * U, Gy - lerp(7.65, 7.0, d) * U]];
+  function stemCtl(pl, tau, lean) {
+    const x0 = cx + pl.off * U, dr = pl.dir, d = sm(.36, .95, tau) * .85, hs = 1 - .22 * budOf(tau);
+    return [[x0, Gy - .45 * U], [x0 - dr * .02 * U, Gy - 4.3 * U * hs],
+      [x0 + dr * (lerp(.12, 1.25, d) - lean * .3) * U, Gy - lerp(6.5, 7.55, d) * U * hs],
+      [x0 + dr * (lerp(.05, 2.15, d) - lean * .45) * U, Gy - (lerp(7.65, 7.0, d) * hs - lean * .2) * U]];
   }
   const bz = (P, s) => { const a = (1 - s) ** 3, b = 3 * (1 - s) ** 2 * s, c = 3 * (1 - s) * s * s, d = s ** 3;
     return [a * P[0][0] + b * P[1][0] + c * P[2][0] + d * P[3][0], a * P[0][1] + b * P[1][1] + c * P[2][1] + d * P[3][1]]; };
-  function headT(tt) {
-    const P = stemCtl(tt), dx = P[3][0] - P[2][0], dy = P[3][1] - P[2][1];
-    return { x: P[3][0], y: P[3][1], rho: Math.atan2(dx, -dy), L: 1.85 * U };
+  function headT(pl, tau, lean) {
+    const P = stemCtl(pl, tau, lean), dx = P[3][0] - P[2][0], dy = P[3][1] - P[2][1];
+    return { x: P[3][0], y: P[3][1], rho: Math.atan2(dx, -dy), L: 1.85 * U * (1 - .3 * budOf(tau)) };
   }
   function proj(p, Hd) {
     const su = p[1] * cE - p[2] * sE, dp = p[2] * cE + p[1] * sE, c = Math.cos(Hd.rho), s = Math.sin(Hd.rho);
     return [Hd.x + (p[0] * c + su * s) * Hd.L, Hd.y - (su * c - p[0] * s) * Hd.L, dp];
   }
-
-  // one petal as a 3D grid; it opens, droops, curls back and shrivels as tau grows
+  // one petal as a 3D grid: a tight green bud below zero, opens, droops, curls and shrivels toward one
   function petalGrid(p, tau) {
-    const lag = p.outer ? 0 : .06, x = tau + p.j;
+    const lag = p.outer ? 0 : .06, x = tau + p.j, b = budOf(tau);
     const o = sm(lag, .62 + lag, x), w = sm(.3 + lag, .96, x);
-    const th = ((p.outer ? 16 : 9) + o * (p.outer ? 60 : 50) + w * 22) * RAD;
+    const th = ((p.outer ? 16 : 9) * (1 - .6 * b) + o * (p.outer ? 60 : 50) + w * 22) * RAD;
     const bend = ((p.outer ? -14 : -22) + o * 18 + w * (p.outer ? 78 : 62)) * RAD;
-    const cup = .62 - o * .45 - w * .5, ws = 1 - w * .32, ls = 1 - w * .1, phi = p.phi + w * p.tw;
+    const cup = .62 + .2 * b - o * .45 - w * .5, ws = (1 - w * .32) * (1 - .4 * b), ls = (1 - w * .1) * (1 - .45 * b), phi = p.phi + w * p.tw;
     const R = [Math.sin(phi), 0, Math.cos(phi)], T = [Math.cos(phi), 0, -Math.sin(phi)];
     const Wd = p.outer ? .44 : .4, G = [];
     let r = p.outer ? .08 : .05, h = 0;
@@ -99,23 +109,24 @@
       }
       G.push(row);
     }
-    return { G, age: sm(.22, .95, x) };
+    return { G, age: sm(.22, .95, x), bud: b };
   }
-  function petalColor(u, v, inner, age) {
-    let c = inner ? mix(COL.inB, COL.inBody, sm(.05, .32, u)) : mix(COL.outB, COL.outBody, sm(.04, .36, u));
-    c = mix(c, COL.edge, sm(.7, 1, Math.abs(v)) * .35 * (1 - age));
+  const BUDG = hex('#93b062');
+  function petalColor(C, u, v, inner, age, bud) {
+    let c = inner ? mix(C.inB, C.inBody, sm(.05, .32, u)) : mix(C.outB, C.outBody, sm(.04, .36, u));
+    c = mix(c, C.edge, sm(.7, 1, Math.abs(v)) * .35 * (1 - age));
+    if (bud > 0) c = mix(c, BUDG, bud * .8 * (1 - u * .45));
     const a = clamp(age * 1.35 + (u - .65) * .5 + (Math.abs(v) - .6) * .45 - .15, 0, 1);
-    return a < .6 ? mix(c, COL.aged, a / .6) : mix(COL.aged, COL.dry, (a - .6) / .4);
+    return a < .6 ? mix(c, C.aged, a / .6) : mix(C.aged, C.dry, (a - .6) / .4);
   }
-  // turn a projected petal into depth-sortable quads (fill + ink edge + veins)
-  function petalQuads(G, S, age, out, xf) {
-    const ink = rgb(mix([112, 28, 46], [74, 50, 36], age), .55);
+  function petalQuads(pl, G, S, age, bud, out, xf) {
+    const ink = rgb(mix(pl.ink, [74, 50, 36], age), .55);
     for (let k = 0; k < NU; k++) for (let j = 0; j < NV; j++) {
       const a = G[k][j], b = G[k + 1][j], c = G[k + 1][j + 1], d = G[k][j + 1];
       let n = norm(cross(add(sub(b, a), sub(c, d)), add(sub(d, a), sub(c, b))));
       const inner = dot(n, VIEW) > 0; if (!inner) n = [-n[0], -n[1], -n[2]];
       const shade = .66 + .42 * Math.max(0, dot(n, LIGHT)) - (inner ? 0 : .05);
-      const col = mul(petalColor((k + .5) / NU, (j + .5) / NV * 2 - 1, inner, age), Math.min(1.08, shade));
+      const col = mul(petalColor(pl.col, (k + .5) / NU, (j + .5) / NV * 2 - 1, inner, age, bud), Math.min(1.08, shade));
       let q = [S[k][j], S[k + 1][j], S[k + 1][j + 1], S[k][j + 1]];
       if (xf) q = q.map(xf);
       out.push({ z: (q[0][2] + q[1][2] + q[2][2] + q[3][2]) / 4, q, col: rgb(col), ink, eL: j === 0, eR: j === NV - 1, vein: j >= 2 && j <= 4 });
@@ -126,7 +137,7 @@
     const q = it.q;
     g.beginPath(); g.moveTo(q[0][0], q[0][1]); g.lineTo(q[1][0], q[1][1]); g.lineTo(q[2][0], q[2][1]); g.lineTo(q[3][0], q[3][1]); g.closePath();
     g.fillStyle = it.col; g.fill(); g.strokeStyle = it.col; g.lineWidth = .9; g.stroke();
-    if (it.vein) { g.strokeStyle = 'rgba(120,40,55,.16)'; g.lineWidth = U / 110; g.beginPath(); g.moveTo(q[0][0], q[0][1]); g.lineTo(q[1][0], q[1][1]); g.stroke(); }
+    if (it.vein) { g.strokeStyle = 'rgba(120,60,55,.14)'; g.lineWidth = U / 110; g.beginPath(); g.moveTo(q[0][0], q[0][1]); g.lineTo(q[1][0], q[1][1]); g.stroke(); }
     if (it.eL || it.eR) {
       g.strokeStyle = it.ink; g.lineWidth = U / 75; g.beginPath();
       if (it.eL) { g.moveTo(q[0][0], q[0][1]); g.lineTo(q[1][0], q[1][1]); }
@@ -134,8 +145,8 @@
       g.stroke();
     }
   }
-  function stamenItems(tt, Hd, out) {
-    const age = sm(.45, 1, tt);
+  function stamenItems(tau, Hd, out) {
+    const age = sm(.45, 1, tau);
     const pist = rgb(mix(hex('#c9c66c'), hex('#7d6a3c'), age)), anth = rgb(mix(hex('#3a2233'), hex('#4a3426'), age));
     const recep = proj([0, -.02, 0], Hd);
     out.push({ z: recep[2] - .06, f: g => { g.fillStyle = rgb(mix(hex('#6d9a50'), hex('#8a7e45'), age)); g.beginPath(); g.ellipse(recep[0], recep[1], .09 * U, .07 * U, Hd.rho, 0, 7); g.fill(); } });
@@ -153,24 +164,20 @@
       } });
     }
   }
-
-  // ---------- stem, leaves, vase ----------
   function strokeBz(g, P) { g.beginPath(); g.moveTo(P[0][0], P[0][1]); g.bezierCurveTo(P[1][0], P[1][1], P[2][0], P[2][1], P[3][0], P[3][1]); g.stroke(); }
-  function drawStem(g, tt) {
-    const P = stemCtl(tt), age = sm(.35, 1, tt);
+  function drawStem(g, P, age) {
     g.lineCap = 'round';
     g.strokeStyle = rgb(mix(hex('#2f4d2a'), hex('#4d4126'), age)); g.lineWidth = .15 * U; strokeBz(g, P);
     g.strokeStyle = rgb(mix(hex('#68964f'), hex('#8f8746'), age)); g.lineWidth = .11 * U; strokeBz(g, P);
-    g.strokeStyle = 'rgba(255,255,225,.28)'; g.lineWidth = .025 * U;
-    strokeBz(g, P.map(p => [p[0] - .025 * U, p[1]]));
+    g.strokeStyle = 'rgba(255,255,225,.28)'; g.lineWidth = .025 * U; strokeBz(g, P.map(p => [p[0] - .025 * U, p[1]]));
   }
   const LEAF = [
     { s: .30, b0: -26, b1: -74, k0: -16, k1: -102, len: 2.7, w: .6, lag: 0, spots: [[.45, .3], [.62, -.4], [.78, .2]] },
     { s: .47, b0: 24, b1: 68, k0: 14, k1: 114, len: 2.3, w: .52, lag: .05, spots: [[.5, -.3], [.7, .35]] },
   ];
-  function drawLeaf(g, lf, tt) {
-    const A = bz(stemCtl(tt), lf.s), wv = sm(.3 + lf.lag, .98, tt), age = sm(.28 + lf.lag, 1, tt);
-    const b0 = lerp(lf.b0, lf.b1, wv) * RAD, k = lerp(lf.k0, lf.k1, wv) * RAD, n = 18, len = lf.len * U * (1 - wv * .06);
+  function drawLeaf(g, pl, lf, P, tau) {
+    const A = bz(P, lf.s), ta = Math.max(0, tau), wv = sm(.3 + lf.lag, .98, ta), age = sm(.28 + lf.lag, 1, ta), dr = -pl.dir;
+    const b0 = dr * lerp(lf.b0, lf.b1, wv) * RAD, k = dr * lerp(lf.k0, lf.k1, wv) * RAD, n = 18, len = lf.len * U * (1 - wv * .06) * (1 - .2 * budOf(tau));
     const C = [], Lf = [], Rt = [];
     let x = A[0], y = A[1];
     for (let i = 0; i <= n; i++) {
@@ -184,7 +191,6 @@
     const un = mix(mix(hex('#527c43'), hex('#8f8440'), sm(0, .55, age)), hex('#6e5233'), sm(.5, 1, age));
     const half = (edge, col) => { g.beginPath(); g.moveTo(C[0][0], C[0][1]); edge.forEach(p => g.lineTo(p[0], p[1])); for (let i = n; i >= 0; i--) g.lineTo(C[i][0], C[i][1]); g.closePath(); g.fillStyle = rgb(col); g.fill(); };
     half(Lf, mul(un, .95)); half(Rt, up);
-    // browning edges, parallel veins, midrib, ink
     g.lineJoin = 'round';
     if (age > .05) { g.strokeStyle = rgb(hex('#7a5530'), sm(.05, .8, age) * .55); g.lineWidth = U * .05; [Lf, Rt].forEach(E2 => { g.beginPath(); E2.forEach((p, i) => i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1])); g.stroke(); }); }
     g.strokeStyle = 'rgba(240,250,215,.22)'; g.lineWidth = U / 120;
@@ -201,26 +207,46 @@
     for (let i = 1; i < VPROF.length; i++) if (f <= VPROF[i][0]) { const a = VPROF[i - 1], b = VPROF[i], k = (f - a[0]) / (b[0] - a[0]); return lerp(a[1], b[1], (1 - Math.cos(k * Math.PI)) / 2); }
     return VPROF[VPROF.length - 1][1];
   }
-  function vasePath(g, f0, f1) {
+  function vasePath(g, x0, f0, f1) {
     const Hv = 3.1 * U; g.beginPath();
-    for (let f = f0; f <= f1 + 1e-6; f += .02) g.lineTo(cx - vr(f) * U, Gy - f * Hv);
-    for (let f = f1; f >= f0 - 1e-6; f -= .02) g.lineTo(cx + vr(f) * U, Gy - f * Hv);
+    for (let f = f0; f <= f1 + 1e-6; f += .02) g.lineTo(x0 - vr(f) * U, Gy - f * Hv);
+    for (let f = f1; f >= f0 - 1e-6; f -= .02) g.lineTo(x0 + vr(f) * U, Gy - f * Hv);
     g.closePath();
   }
-  function drawVase(g, tt) {
-    const Hv = 3.1 * U, fw = lerp(.62, .22, tt), lw = Math.max(1, U / 55);
-    // table shadow
-    const gr = g.createRadialGradient(cx, Gy, 0, cx, Gy, U * 1.2); gr.addColorStop(0, 'rgba(70,60,40,.25)'); gr.addColorStop(1, 'rgba(70,60,40,0)');
-    g.save(); g.translate(cx, Gy); g.scale(1, .13); g.fillStyle = gr; g.beginPath(); g.arc(0, 0, U * 1.2, 0, 7); g.fill(); g.restore();
-    vasePath(g, 0, 1); g.fillStyle = 'rgba(205,222,220,.2)'; g.fill();
-    vasePath(g, .02, fw); g.fillStyle = 'rgba(150,190,178,.22)'; g.fill();
-    const rx = vr(fw) * U; g.beginPath(); g.ellipse(cx, Gy - fw * Hv, rx, rx * .16, 0, 0, 7); g.fillStyle = 'rgba(225,240,232,.35)'; g.fill(); g.strokeStyle = 'rgba(90,120,115,.45)'; g.lineWidth = lw * .8; g.stroke();
-    vasePath(g, 0, 1); g.strokeStyle = 'rgba(58,70,68,.6)'; g.lineWidth = lw; g.stroke();
-    g.beginPath(); g.ellipse(cx, Gy - .04 * U, .5 * U, .09 * U, 0, 0, 7); g.strokeStyle = 'rgba(58,70,68,.35)'; g.stroke();
-    g.beginPath(); g.ellipse(cx, Gy - Hv, .33 * U, .06 * U, 0, 0, 7); g.strokeStyle = 'rgba(58,70,68,.55)'; g.stroke();
+  function tableShadow(g, x, rx, a) {
+    const gr = g.createRadialGradient(x, Gy, 0, x, Gy, rx); gr.addColorStop(0, `rgba(70,60,40,${a})`); gr.addColorStop(1, 'rgba(70,60,40,0)');
+    g.save(); g.translate(x, Gy); g.scale(1, .13); g.fillStyle = gr; g.beginPath(); g.arc(0, 0, rx, 0, 7); g.fill(); g.restore();
+  }
+  function drawVase(g, x0, tau) {
+    const Hv = 3.1 * U, fw = lerp(.62, .22, clamp(tau, 0, 1)), lw = Math.max(1, U / 55);
+    tableShadow(g, x0, U * 1.2, .25);
+    vasePath(g, x0, 0, 1); g.fillStyle = 'rgba(205,222,220,.2)'; g.fill();
+    vasePath(g, x0, .02, fw); g.fillStyle = 'rgba(150,190,178,.22)'; g.fill();
+    const rx = vr(fw) * U; g.beginPath(); g.ellipse(x0, Gy - fw * Hv, rx, rx * .16, 0, 0, 7); g.fillStyle = 'rgba(225,240,232,.35)'; g.fill(); g.strokeStyle = 'rgba(90,120,115,.45)'; g.lineWidth = lw * .8; g.stroke();
+    vasePath(g, x0, 0, 1); g.strokeStyle = 'rgba(58,70,68,.6)'; g.lineWidth = lw; g.stroke();
+    g.beginPath(); g.ellipse(x0, Gy - .04 * U, .5 * U, .09 * U, 0, 0, 7); g.strokeStyle = 'rgba(58,70,68,.35)'; g.stroke();
+    g.beginPath(); g.ellipse(x0, Gy - Hv, .33 * U, .06 * U, 0, 0, 7); g.strokeStyle = 'rgba(58,70,68,.55)'; g.stroke();
     g.strokeStyle = 'rgba(255,255,255,.65)'; g.lineWidth = U / 26; g.lineCap = 'round';
-    g.beginPath(); for (let f = .1; f <= .46; f += .02) g.lineTo(cx - vr(f) * U * .62, Gy - f * Hv); g.stroke();
-    g.lineWidth = U / 45; g.beginPath(); for (let f = .76; f <= .93; f += .02) g.lineTo(cx - vr(f) * U * .5, Gy - f * Hv); g.stroke();
+    g.beginPath(); for (let f = .1; f <= .46; f += .02) g.lineTo(x0 - vr(f) * U * .62, Gy - f * Hv); g.stroke();
+    g.lineWidth = U / 45; g.beginPath(); for (let f = .76; f <= .93; f += .02) g.lineTo(x0 - vr(f) * U * .5, Gy - f * Hv); g.stroke();
+  }
+  function plantLists(pl, tt, L) {
+    const tau = pl.tau(tt), lean = leanAt(tt), Hd = headT(pl, tau, lean);
+    pl.pet.forEach(p => {
+      if (tau < p.td) { const { G, age, bud } = petalGrid(p, tau); petalQuads(pl, G, G.map(r => r.map(q => proj(q, Hd))), age, bud, L.head); return; }
+      // detached: keeps the shape it had at td and falls to the table (rewind flies it back)
+      const f = clamp((tau - p.td) / FD, 0, 1), { G } = petalGrid(p, p.td), Ht = headT(pl, p.td, 0), S = G.map(r => r.map(q => proj(q, Ht)));
+      let mx = 0, my = 0, n = 0; S.forEach(r => r.forEach(q => { mx += q[0]; my += q[1]; n++; })); mx /= n; my /= n;
+      const Lx = cx + (pl.off + pl.dir * p.land[0]) * U, Ly = Gy + p.land[1] * U, e = sm(0, 1, f), age = sm(.22, 1.05, tau);
+      const px = lerp(mx, Lx, e) + Math.sin(f * Math.PI * 2.2 + p.rf) * .45 * U * Math.sin(Math.PI * f);
+      const py = my + (Ly - my) * (f * f * .35 + f * .65);
+      const rot = p.spin * e, cr = Math.cos(rot), sr = Math.sin(rot), sc = 1 - .12 * age * e;
+      const syc = lerp(1, .62, e) * (1 - .4 * Math.sin(f * Math.PI * 3) ** 2);
+      const xf = q => { const dx = (q[0] - mx) * sc, dy = (q[1] - my) * sc; return [px + dx * cr - dy * sr, py + (dx * sr + dy * cr) * syc, q[2]]; };
+      petalQuads(pl, G, S, age, 0, f >= 1 ? (p.land[1] < 0 ? L.back : L.front) : L.falling, xf);
+    });
+    stamenItems(Math.max(0, tau), Hd, L.head);
+    return { tau, P: stemCtl(pl, tau, lean) };
   }
 
   // ---------- pocket watch ----------
@@ -228,38 +254,26 @@
   const crownY = () => wyc - Rw * 1.2;
   function drawWatch(g, tt) {
     const X = wxc, Y = wyc, R = Rw, cy = crownY(), lw = Math.max(1, U / 60), ink = 'rgba(72,48,20,.75)';
-    const gr0 = g.createRadialGradient(X, Gy, 0, X, Gy, R * 1.15); gr0.addColorStop(0, 'rgba(60,40,20,.3)'); gr0.addColorStop(1, 'rgba(60,40,20,0)');
-    g.save(); g.translate(X, Gy); g.scale(1, .14); g.fillStyle = gr0; g.beginPath(); g.arc(0, 0, R * 1.15, 0, 7); g.fill(); g.restore();
+    tableShadow(g, X, R * 1.15, .3);
     const brass = (x0, y0, x1, y1) => { const q = g.createLinearGradient(x0, y0, x1, y1); q.addColorStop(0, '#f2dd9c'); q.addColorStop(.45, '#c99f50'); q.addColorStop(1, '#7c5b25'); return q; };
-    // bow
     g.lineCap = 'round';
     g.strokeStyle = ink; g.lineWidth = R * .14; g.beginPath(); g.ellipse(X, cy - .34 * R, .3 * R, .27 * R, 0, Math.PI * .9, Math.PI * 2.1); g.stroke();
     g.strokeStyle = brass(X - .3 * R, cy - .6 * R, X + .3 * R, cy); g.lineWidth = R * .1; g.stroke();
-    // pendant + crown (knurls roll as you wind)
     g.fillStyle = brass(X - .1 * R, 0, X + .1 * R, 0); g.fillRect(X - .1 * R, Y - R - .14 * R, .2 * R, .16 * R);
     g.strokeStyle = ink; g.lineWidth = lw * .8; g.strokeRect(X - .1 * R, Y - R - .14 * R, .2 * R, .16 * R);
     g.beginPath(); g.roundRect(X - .24 * R, cy - .13 * R, .48 * R, .26 * R, .07 * R); g.fillStyle = brass(X, cy - .13 * R, X, cy + .13 * R); g.fill(); g.lineWidth = lw; g.stroke();
     for (let k = 0; k < 18; k++) { const a = crownPh + k * Math.PI / 9, c = Math.cos(a); if (c <= 0) continue;
       const x = X + Math.sin(a) * .22 * R; g.strokeStyle = `rgba(85,58,22,${(.2 + .5 * c).toFixed(2)})`; g.lineWidth = lw * (.5 + .6 * c);
       g.beginPath(); g.moveTo(x, cy - .1 * R); g.lineTo(x, cy + .1 * R); g.stroke(); }
-    // case
     const cg = g.createRadialGradient(X - .35 * R, Y - .4 * R, .1 * R, X, Y, R * 1.05);
     cg.addColorStop(0, '#f7e5ab'); cg.addColorStop(.45, '#d2aa58'); cg.addColorStop(.8, '#93702e'); cg.addColorStop(1, '#5f451a');
     g.beginPath(); g.arc(X, Y, R, 0, 7); g.fillStyle = cg; g.fill(); g.strokeStyle = ink; g.lineWidth = lw; g.stroke();
     g.beginPath(); g.arc(X, Y, R * .92, 0, 7); g.strokeStyle = 'rgba(90,60,20,.5)'; g.stroke();
-    // dial
     const fg = g.createRadialGradient(X - .2 * R, Y - .25 * R, .05 * R, X, Y, .86 * R); fg.addColorStop(0, '#fcf8ec'); fg.addColorStop(1, '#e8dcc0');
     g.beginPath(); g.arc(X, Y, R * .85, 0, 7); g.fillStyle = fg; g.fill(); g.strokeStyle = 'rgba(90,70,40,.55)'; g.lineWidth = lw * .8; g.stroke();
     g.strokeStyle = '#2d2820';
-    for (let i = 0; i < 60; i++) { const a = i / 60 * Math.PI * 2, r2 = i % 5 ? .76 : .72; g.lineWidth = i % 5 ? lw * .5 : lw * 1.1;
+    for (let i = 0; i < 60; i++) { const a = i / 60 * Math.PI * 2, r2 = i % 5 ? .76 : .66; g.lineWidth = i % 5 ? lw * .5 : lw * 2;
       g.beginPath(); g.moveTo(X + Math.sin(a) * .8 * R, Y - Math.cos(a) * .8 * R); g.lineTo(X + Math.sin(a) * r2 * R, Y - Math.cos(a) * r2 * R); g.stroke(); }
-    g.fillStyle = '#2a241c'; g.font = `${(.15 * R).toFixed(1)}px "IM Fell English", serif`; g.textAlign = 'center'; g.textBaseline = 'middle';
-    ['XII', 'I', 'II', '', 'IIII', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI'].forEach((s, i) => { if (!s || i === 6) return; const a = i / 12 * Math.PI * 2; g.fillText(s, X + Math.sin(a) * .61 * R, Y - Math.cos(a) * .61 * R); });
-    // date window at three o'clock
-    const day = new Date(START + Math.round(tt * SPAN) * 864e5).getUTCDate();
-    g.fillStyle = '#fffdf6'; g.fillRect(X + .47 * R, Y - .08 * R, .2 * R, .16 * R); g.strokeStyle = '#3a3226'; g.lineWidth = lw * .6; g.strokeRect(X + .47 * R, Y - .08 * R, .2 * R, .16 * R);
-    g.fillStyle = '#2a241c'; g.font = `${(.12 * R).toFixed(1)}px "IM Fell English", serif`; g.fillText(String(day), X + .57 * R, Y + .005 * R);
-    // small seconds at six
     const sy = Y + .42 * R; g.beginPath(); g.arc(X, sy, .17 * R, 0, 7); g.strokeStyle = 'rgba(45,40,32,.6)'; g.lineWidth = lw * .6; g.stroke();
     for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2; g.beginPath(); g.moveTo(X + Math.sin(a) * .17 * R, sy - Math.cos(a) * .17 * R); g.lineTo(X + Math.sin(a) * .14 * R, sy - Math.cos(a) * .14 * R); g.stroke(); }
     const hand = (cxh, cyh, a, len, w, tail, col) => { g.save(); g.translate(cxh, cyh); g.rotate(a); g.fillStyle = col; g.beginPath(); g.moveTo(-w / 2, tail); g.lineTo(-w * .3, -len); g.lineTo(0, -len - w * 1.2); g.lineTo(w * .3, -len); g.lineTo(w / 2, tail); g.closePath(); g.fill(); g.restore(); };
@@ -269,149 +283,294 @@
     g.save(); g.translate(X, Y); g.rotate(hA); g.beginPath(); g.arc(0, -.3 * R, .055 * R, 0, 7); g.strokeStyle = blue; g.lineWidth = .025 * R; g.stroke(); g.restore();
     hand(X, Y, mA, .7 * R, .032 * R, .12 * R, blue);
     g.beginPath(); g.arc(X, Y, .04 * R, 0, 7); g.fillStyle = blue; g.fill();
-    // glass glint
     g.strokeStyle = 'rgba(255,255,255,.45)'; g.lineWidth = .05 * R; g.beginPath(); g.arc(X, Y, .74 * R, 200 * RAD, 255 * RAD); g.stroke();
+    // a faint breathing ring on the crown until it has been wound
+    if (wound < 2.5 * U) { const a = .25 + .2 * Math.sin(performance.now() / 420);
+      g.strokeStyle = `rgba(201,160,81,${a.toFixed(3)})`; g.lineWidth = lw * 1.4; g.beginPath(); g.roundRect(X - .36 * R, cy - .25 * R, .72 * R, .5 * R, .18 * R); g.stroke(); }
   }
 
-  // ---------- the whole still life, a pure function of t ----------
-  function renderScene(tt) {
-    const g = fx; g.setTransform(DPR, 0, 0, DPR, 0, 0); g.clearRect(0, 0, W, H);
-    const head = [], back = [], front = [], falling = [];
-    const Hd = headT(tt);
-    PET.forEach(p => {
-      if (tt < p.td) { const { G, age } = petalGrid(p, tt); petalQuads(G, G.map(r => r.map(q => proj(q, Hd))), age, head); return; }
-      // detached: the petal keeps the shape it had at td and falls to the table (rewind flies it back)
-      const f = clamp((tt - p.td) / FD, 0, 1), { G } = petalGrid(p, p.td), Ht = headT(p.td), S = G.map(r => r.map(q => proj(q, Ht)));
-      let mx = 0, my = 0, n = 0; S.forEach(r => r.forEach(q => { mx += q[0]; my += q[1]; n++; })); mx /= n; my /= n;
-      const Lx = cx + p.land[0] * U, Ly = Gy + p.land[1] * U, e = sm(0, 1, f), age = sm(.22, 1.05, tt);
-      const px = lerp(mx, Lx, e) + Math.sin(f * Math.PI * 2.2 + p.rf) * .45 * U * Math.sin(Math.PI * f);
-      const py = my + (Ly - my) * (f * f * .35 + f * .65);
-      const rot = p.spin * e, cr = Math.cos(rot), sr = Math.sin(rot), sc = 1 - .12 * age * e;
-      const syc = lerp(1, .62, e) * (1 - .4 * Math.sin(f * Math.PI * 3) ** 2);
-      const xf = q => { const dx = (q[0] - mx) * sc, dy = (q[1] - my) * sc; return [px + dx * cr - dy * sr, py + (dx * sr + dy * cr) * syc, q[2]]; };
-      petalQuads(G, S, age, f >= 1 ? (p.land[1] < 0 ? back : front) : falling, xf);
+  // ---------- candle: lit early, burns down, goes out; rewound, the flame slips back into the wick ----------
+  const T_LIGHT = .06, T_OUT = .945;
+  const DRIPS = (() => { seed = 33; return [0, 1, 2, 3].map(i => ({ x: [-.16, .1, -.05, .17][i], len: .25 + rnd() * .5, st: .1 + i * .15 })); })();
+  function candleState(tt) {
+    const burn = sm(T_LIGHT, T_OUT, tt), h = lerp(2.4, .55, burn) * U;
+    const flame = sm(T_LIGHT, T_LIGHT + .025, tt) * (1 - sm(T_OUT - .012, T_OUT, tt));
+    return { h, flame, burn };
+  }
+  function drawCandle(g, tt, now) {
+    const x = cx - 6.1 * U, { h, flame } = candleState(tt), w = .38 * U, top = Gy - .28 * U - h;
+    tableShadow(g, x, .9 * U, .25);
+    // brass holder
+    const br = g.createLinearGradient(x - .7 * U, 0, x + .7 * U, 0); br.addColorStop(0, '#f2dd9c'); br.addColorStop(.5, '#c99f50'); br.addColorStop(1, '#7c5b25');
+    g.fillStyle = br; g.strokeStyle = 'rgba(72,48,20,.7)'; g.lineWidth = Math.max(1, U / 60);
+    g.beginPath(); g.ellipse(x, Gy - .08 * U, .72 * U, .14 * U, 0, 0, 7); g.fill(); g.stroke();
+    g.beginPath(); g.rect(x - .26 * U, Gy - .3 * U, .52 * U, .22 * U); g.fill(); g.stroke();
+    // pooled wax at the foot grows as it burns
+    const pool = sm(.15, 1, tt);
+    if (pool > 0) { g.fillStyle = '#f1e8d2'; g.beginPath(); g.ellipse(x, Gy - .3 * U, (w / 2 + .12 * U * pool), .05 * U + .04 * U * pool, 0, 0, 7); g.fill(); }
+    // body
+    const wg = g.createLinearGradient(x - w / 2, 0, x + w / 2, 0); wg.addColorStop(0, '#efe4cb'); wg.addColorStop(.4, '#fbf6ea'); wg.addColorStop(1, '#d9cba9');
+    g.fillStyle = wg; g.beginPath(); g.rect(x - w / 2, top, w, h); g.fill();
+    g.strokeStyle = 'rgba(110,95,70,.5)'; g.lineWidth = Math.max(1, U / 70); g.stroke();
+    // drips run down; rewound they climb back up
+    DRIPS.forEach(d => { const L = d.len * U * sm(d.st, T_OUT, tt); if (L < 1) return;
+      const dx = x + d.x * U; g.strokeStyle = '#f6efde'; g.lineCap = 'round'; g.lineWidth = .07 * U;
+      g.beginPath(); g.moveTo(dx, top + .02 * U); g.lineTo(dx, top + Math.min(h - .05 * U, L)); g.stroke(); });
+    g.fillStyle = '#e9dcbf'; g.beginPath(); g.ellipse(x, top, w / 2, .06 * U, 0, 0, 7); g.fill();
+    // wick
+    g.strokeStyle = flame > .05 ? '#2a1d12' : '#3b2b1d'; g.lineWidth = Math.max(1.2, U / 40); g.lineCap = 'round';
+    g.beginPath(); g.moveTo(x, top); g.quadraticCurveTo(x + .03 * U, top - .08 * U, x + .02 * U, top - .15 * U); g.stroke();
+    if (flame > .01) {
+      const fl2 = flame * (1 + .06 * Math.sin(now / 70) + .04 * Math.sin(now / 37)), fh = .62 * U * fl2, fw = .2 * U * fl2, fy = top - .14 * U, sway = Math.sin(now / 260) * .03 * U;
+      const gl = g.createRadialGradient(x, fy - fh * .45, fh * .05, x, fy - fh * .35, fh * .7);
+      gl.addColorStop(0, 'rgba(255,253,235,1)'); gl.addColorStop(.35, 'rgba(255,214,120,.95)'); gl.addColorStop(.75, 'rgba(240,130,40,.55)'); gl.addColorStop(1, 'rgba(240,130,40,0)');
+      g.fillStyle = gl; g.beginPath(); g.moveTo(x, fy + fw * .3);
+      g.bezierCurveTo(x - fw, fy - fh * .1, x - fw * .5 + sway, fy - fh * .7, x + sway * 2, fy - fh);
+      g.bezierCurveTo(x + fw * .5 + sway, fy - fh * .7, x + fw, fy - fh * .1, x, fy + fw * .3); g.fill();
+      g.fillStyle = 'rgba(90,120,220,.35)'; g.beginPath(); g.ellipse(x, fy - fw * .05, fw * .35, fw * .3, 0, 0, 7); g.fill();
+    }
+    // a thread of smoke after it goes out
+    const smoke = sm(T_OUT, T_OUT + .006, tt) * (1 - sm(T_OUT + .006, .99, tt));
+    if (smoke > .01) {
+      const rise = sm(T_OUT, .99, tt) * 2.2 * U;
+      g.strokeStyle = `rgba(150,150,155,${(.45 * smoke).toFixed(3)})`; g.lineWidth = U / 30; g.beginPath();
+      for (let i = 0; i <= 20; i++) { const k = i / 20, yy = top - .15 * U - k * (.4 * U + rise), xx = x + Math.sin(k * 7 + now / 600) * .12 * U * k; i ? g.lineTo(xx, yy) : g.moveTo(xx, yy); }
+      g.stroke();
+    }
+  }
+  function candleGlow(g, tt) {
+    const { h, flame } = candleState(tt); if (flame < .01) return;
+    const x = cx - 6.1 * U, y = Gy - .28 * U - h - .4 * U, r = 3.2 * U;
+    const gr = g.createRadialGradient(x, y, 0, x, y, r); gr.addColorStop(0, `rgba(255,190,110,${(.22 * flame).toFixed(3)})`); gr.addColorStop(1, 'rgba(255,190,110,0)');
+    g.fillStyle = gr; g.fillRect(x - r, y - r, r * 2, r * 2);
+  }
+
+  // ---------- teacup: it breaks; rewound, the pieces fly together and the tea climbs back in ----------
+  const T_BREAK = .55;
+  const SHARDS = (() => { seed = 55; const n = 7, out = []; let a = -Math.PI / 2;
+    for (let i = 0; i < n; i++) { const a2 = a + Math.PI * 2 / n * (.8 + rnd() * .4); out.push({ a0: a, a1: a2, dx: (rnd() - .5) * 1.4, dy: .1 + rnd() * .35, rot: (rnd() - .5) * 2.2, hop: .2 + rnd() * .5 }); a = a2; }
+    out[n - 1].a1 = -Math.PI / 2 + Math.PI * 2; return out; })();
+  function makeCup() {
+    const s = DPR, w = 1.7 * U, h = 1.3 * U; cupC.width = Math.ceil(w * s); cupC.height = Math.ceil(h * s);
+    const g = cupX; g.setTransform(s, 0, 0, s, .72 * U * s, 1.18 * U * s); // origin = bottom centre of the cup
+    const lw = Math.max(1, U / 60);
+    g.strokeStyle = 'rgba(70,80,90,.7)'; g.lineWidth = lw;
+    g.lineWidth = .09 * U; g.strokeStyle = '#f4f4f2'; g.beginPath(); g.ellipse(.5 * U, -.55 * U, .16 * U, .22 * U, 0, -Math.PI / 2, Math.PI / 2); g.stroke();
+    g.lineWidth = lw; g.strokeStyle = 'rgba(70,80,90,.6)'; g.beginPath(); g.ellipse(.5 * U, -.55 * U, .21 * U, .27 * U, 0, -Math.PI / 2, Math.PI / 2); g.stroke();
+    g.beginPath(); g.ellipse(.5 * U, -.55 * U, .11 * U, .17 * U, 0, -Math.PI / 2, Math.PI / 2); g.stroke();
+    const body = () => { g.beginPath(); g.moveTo(-.46 * U, -.95 * U); g.bezierCurveTo(-.46 * U, -.35 * U, -.36 * U, 0, -.2 * U, 0); g.lineTo(.2 * U, 0); g.bezierCurveTo(.36 * U, 0, .46 * U, -.35 * U, .46 * U, -.95 * U); g.closePath(); };
+    const pg = g.createLinearGradient(-.46 * U, 0, .46 * U, 0); pg.addColorStop(0, '#e7eaec'); pg.addColorStop(.35, '#ffffff'); pg.addColorStop(1, '#c9ced3');
+    body(); g.fillStyle = pg; g.fill(); g.strokeStyle = 'rgba(70,80,90,.7)'; g.lineWidth = lw; g.stroke();
+    g.save(); body(); g.clip(); g.strokeStyle = '#3d62a8'; g.lineWidth = .05 * U; g.beginPath(); g.moveTo(-.5 * U, -.8 * U); g.lineTo(.5 * U, -.8 * U); g.stroke();
+    g.lineWidth = U / 60; for (let i = -3; i <= 3; i++) { g.beginPath(); g.arc(i * .13 * U, -.62 * U, .045 * U, 0, 7); g.stroke(); } g.restore();
+    g.fillStyle = '#ffffff'; g.beginPath(); g.ellipse(0, -.95 * U, .46 * U, .09 * U, 0, 0, 7); g.fill(); g.stroke();
+    g.fillStyle = '#8a5426'; g.beginPath(); g.ellipse(0, -.93 * U, .4 * U, .065 * U, 0, 0, 7); g.fill();
+    g.fillStyle = 'rgba(255,230,190,.4)'; g.beginPath(); g.ellipse(-.12 * U, -.94 * U, .12 * U, .02 * U, 0, 0, 7); g.fill();
+  }
+  function drawCup(g, tt, now) {
+    const x = cx + 3.6 * U, y = Gy + .42 * U, f = sm(T_BREAK, T_BREAK + .022, tt), lw = Math.max(1, U / 60);
+    // saucer
+    g.fillStyle = '#fbfbfa'; g.strokeStyle = 'rgba(70,80,90,.6)'; g.lineWidth = lw;
+    g.beginPath(); g.ellipse(x, y, .78 * U, .15 * U, 0, 0, 7); g.fill(); g.stroke();
+    g.beginPath(); g.ellipse(x, y - .01 * U, .4 * U, .07 * U, 0, 0, 7); g.stroke();
+    // spilled tea spreads; rewound it gathers and rises
+    const spill = sm(T_BREAK + .005, T_BREAK + .07, tt);
+    if (spill > 0) { g.fillStyle = 'rgba(138,84,38,.42)';
+      [[0, 0, 1], [.5, .05, .7], [-.45, .07, .6], [.9, .1, .45]].forEach(([ox, oy, r]) => { g.beginPath(); g.ellipse(x + ox * U * spill, y + oy * U, .5 * U * r * spill + 1, .1 * U * r * spill + 1, 0, 0, 7); g.fill(); }); }
+    const ox = .72 * U, oy = 1.18 * U, w = cupC.width / DPR, h = cupC.height / DPR, pc = [0, -.5 * U];
+    if (f <= 0) {
+      g.drawImage(cupC, x - ox, y - .02 * U - oy, w, h);
+      const steam = 1 - sm(.05, .5, tt);
+      if (steam > .02) { g.lineWidth = U / 40; g.lineCap = 'round';
+        for (let i = 0; i < 3; i++) { g.strokeStyle = `rgba(170,175,180,${(.35 * steam).toFixed(3)})`; g.beginPath();
+          for (let k = 0; k <= 16; k++) { const q = k / 16, yy = y - 1.05 * U - q * 1.1 * U, xx = x + (i - 1) * .18 * U + Math.sin(q * 6 + now / 500 + i * 2) * .08 * U; k ? g.lineTo(xx, yy) : g.moveTo(xx, yy); } g.stroke(); } }
+      return;
+    }
+    SHARDS.forEach(s => {
+      const R = 2 * U, mid = (s.a0 + s.a1) / 2;
+      const tx = s.dx * U * f + Math.cos(mid) * .25 * U * f, ty = s.dy * U * f + (.95 * U - .5 * U) * f * (Math.sin(mid) < 0 ? 1 : .2) - Math.sin(Math.PI * f) * s.hop * U;
+      g.save(); g.translate(x + pc[0] + tx, y - .02 * U + pc[1] + ty); g.rotate(s.rot * f);
+      g.beginPath(); g.moveTo(0, 0); g.lineTo(Math.cos(s.a0) * R, Math.sin(s.a0) * R); g.lineTo(Math.cos((s.a0 + s.a1) / 2) * R * 1.2, Math.sin((s.a0 + s.a1) / 2) * R * 1.2); g.lineTo(Math.cos(s.a1) * R, Math.sin(s.a1) * R); g.closePath(); g.clip();
+      g.drawImage(cupC, -pc[0] - ox, -pc[1] - oy, w, h);
+      g.restore();
     });
-    stamenItems(tt, Hd, head);
+  }
+
+  // ---------- dandelion: seeds drift off; rewound, they float home and the clock fills again ----------
+  const SEEDS = (() => { seed = 77; return Array.from({ length: 64 }, (_, i) => ({ a: i / 64 * Math.PI * 2 + (rnd() - .5) * .1, l: .5 + rnd() * .28, tr: .12 + rnd() * .8, sp: .6 + rnd() * .5, ph: rnd() * 6 })); })();
+  const DX = 5.6;
+  function dandeHead(tt) { const sway = 0; return [cx + (DX - .25) * U + sway, Gy - 4.5 * U]; }
+  function drawDandelion(g, tt) {
+    const x0 = cx + DX * U, hd = dandeHead(tt), age = sm(.2, 1, tt), lw = Math.max(1, U / 60);
+    tableShadow(g, x0, .7 * U, .22);
+    // little bottle
+    // stem first, glass over it
+    g.save(); g.strokeStyle = rgb(mix(hex('#7aa15c'), hex('#9a8c55'), age)); g.lineWidth = .06 * U; g.lineCap = 'round';
+    g.beginPath(); g.moveTo(x0, Gy - .25 * U); g.quadraticCurveTo(x0 + .1 * U, Gy - 3 * U, hd[0], hd[1]); g.stroke(); g.restore();
+    g.fillStyle = 'rgba(205,222,220,.25)'; g.strokeStyle = 'rgba(58,70,68,.6)'; g.lineWidth = lw;
+    g.beginPath(); g.moveTo(x0 - .12 * U, Gy - 1.35 * U); g.lineTo(x0 - .12 * U, Gy - 1.0 * U); g.quadraticCurveTo(x0 - .45 * U, Gy - .85 * U, x0 - .45 * U, Gy - .5 * U); g.lineTo(x0 - .45 * U, Gy);
+    g.lineTo(x0 + .45 * U, Gy); g.lineTo(x0 + .45 * U, Gy - .5 * U); g.quadraticCurveTo(x0 + .45 * U, Gy - .85 * U, x0 + .12 * U, Gy - 1.0 * U); g.lineTo(x0 + .12 * U, Gy - 1.35 * U); g.closePath();
+    g.fill(); g.stroke();
+    g.strokeStyle = 'rgba(255,255,255,.7)'; g.lineWidth = U / 40; g.beginPath(); g.moveTo(x0 - .32 * U, Gy - .15 * U); g.lineTo(x0 - .32 * U, Gy - .55 * U); g.stroke();
+    // seed head
+    g.fillStyle = rgb(mix(hex('#c8b98a'), hex('#9b8a62'), age)); g.beginPath(); g.arc(hd[0], hd[1], .09 * U, 0, 7); g.fill();
+    SEEDS.forEach(s => { if (tt >= s.tr) return; drawSeed(g, hd[0], hd[1], s.a, s.l * U, 1); });
+  }
+  function drawSeed(g, bx, by, a, l, alpha) {
+    const ex = bx + Math.cos(a) * l, ey = by + Math.sin(a) * l;
+    g.strokeStyle = `rgba(150,140,120,${(.55 * alpha).toFixed(3)})`; g.lineWidth = Math.max(.6, U / 120);
+    g.beginPath(); g.moveTo(bx + Math.cos(a) * .1 * U, by + Math.sin(a) * .1 * U); g.lineTo(ex, ey); g.stroke();
+    g.fillStyle = `rgba(110,90,60,${(.8 * alpha).toFixed(3)})`; g.beginPath(); g.ellipse(bx + Math.cos(a) * .14 * U, by + Math.sin(a) * .14 * U, .035 * U, .015 * U, a, 0, 7); g.fill();
+    g.strokeStyle = `rgba(175,178,182,${(.6 * alpha).toFixed(3)})`;
+    g.beginPath(); for (let i = -3; i <= 3; i++) { const b = a + i * .26; g.moveTo(ex, ey); g.lineTo(ex + Math.cos(b) * .17 * U, ey + Math.sin(b) * .17 * U); } g.stroke();
+  }
+  function drawFlyingSeeds(g, tt) {
+    const hd = dandeHead(tt);
+    SEEDS.forEach(s => { if (tt < s.tr) return; const f = (tt - s.tr) / (.22 * s.sp); if (f > 1.2) return;
+      const ex = hd[0] + Math.cos(s.a) * s.l * U, ey = hd[1] + Math.sin(s.a) * s.l * U;
+      const px = ex - f * 9 * U + Math.sin(f * 5 + s.ph) * .5 * U, py = ey - f * 3.2 * U - f * f * 1.5 * U + Math.cos(f * 4 + s.ph) * .3 * U;
+      drawSeed(g, px - Math.cos(s.a - f * 2) * s.l * U * .35, py - Math.sin(s.a - f * 2) * s.l * U * .35, -Math.PI / 2 + Math.sin(f * 6 + s.ph) * .5, s.l * U * .35, 1 - sm(.8, 1.2, f)); });
+  }
+
+  // ---------- letter: it burns from a corner; rewound, the ash gathers into paper again ----------
+  const LNX = 28, LNY = 18, T_BURN = .62, T_BURNT = .9;
+  const LTH = (() => { seed = 99; const a = []; for (let j = 0; j < LNY; j++) for (let i = 0; i < LNX; i++) {
+    const d = Math.hypot((LNX - 1 - i) / LNX, (j) / LNY * .7); a.push(clamp(d / 1.1 + (rnd() - .5) * .14 + Math.sin(i * .7) * .03, 0, 1)); } return a; })();
+  function makeLetter() {
+    const lw = 2.6 * U, lh = 1.8 * U, s = DPR; letC.width = Math.ceil(lw * s); letC.height = Math.ceil(lh * s);
+    const g = letX; g.setTransform(s, 0, 0, s, 0, 0);
+    g.fillStyle = '#f8f3e4'; g.fillRect(0, 0, lw, lh);
+    g.strokeStyle = 'rgba(170,150,110,.5)'; g.lineWidth = 1; g.strokeRect(.5, .5, lw - 1, lh - 1);
+    seed = 123; g.strokeStyle = 'rgba(40,45,80,.72)'; g.lineWidth = Math.max(1, U / 55); g.lineCap = 'round';
+    for (let r = 0; r < 8; r++) { const y = .3 * U + r * .17 * U, x1 = .3 * U + (r === 0 ? 0 : .0), x2 = lw - .3 * U - rnd() * (r === 7 ? 1.2 : .5) * U;
+      g.beginPath(); for (let x = x1; x <= x2; x += U / 40) { const yy = y + Math.sin(x * 1.7 / U * 6 + r) * .025 * U + Math.sin(x * 4.3 / U * 6) * .012 * U; x === x1 ? g.moveTo(x, yy) : g.lineTo(x, yy); } g.stroke(); }
+    g.fillStyle = '#a3262f'; g.beginPath(); g.arc(lw - .45 * U, lh - .35 * U, .14 * U, 0, 7); g.fill();
+    g.fillStyle = 'rgba(255,200,200,.35)'; g.beginPath(); g.arc(lw - .49 * U, lh - .39 * U, .05 * U, 0, 7); g.fill();
+  }
+  function drawLetter(g, tt) {
+    const x = cx - .1 * U, y = Gy + .62 * U, lw = 2.6 * U, lh = 1.8 * U, bt = sm(T_BURN, T_BURNT, tt) * 1.06, cw = lw / LNX, ch = lh / LNY;
+    const A = -.07, ca = Math.cos(A), sa = Math.sin(A), SQ = .42;
+    const toScreen = (u, v) => { const px = u - lw / 2, py = (v - lh / 2) * SQ; return [x + px * ca - py * sa, y + px * sa + py * ca]; };
+    g.save(); g.setTransform(DPR * ca, DPR * sa, -DPR * sa * SQ, DPR * ca * SQ, DPR * x, DPR * y); g.translate(-lw / 2, -lh / 2);
+    // soft shadow under the sheet
+    const flakes = [];
+    for (let j = 0; j < LNY; j++) for (let i = 0; i < LNX; i++) {
+      const th = LTH[j * LNX + i], z = bt - th;
+      if (z > .05) { if ((i + j) % 3 === 0) flakes.push([i, j, z]); continue; }
+      g.drawImage(letC, i * cw * DPR, j * ch * DPR, cw * DPR, ch * DPR, i * cw - .3, j * ch - .3, cw + .6, ch + .6);
+      if (z > -.05) {
+        const k = sm(-.05, .05, z);
+        g.fillStyle = `rgba(${lerp(150, 30, k) | 0},${lerp(100, 20, k) | 0},${lerp(50, 12, k) | 0},${(k * .92 + .12).toFixed(3)})`; g.fillRect(i * cw - .3, j * ch - .3, cw + .6, ch + .6);
+        if (z > .02 && tt < T_BURNT + .03) { g.fillStyle = `rgba(255,${(140 + 80 * Math.random()) | 0},60,.75)`; g.fillRect(i * cw, j * ch, cw, ch * .5); }
+      }
+    }
+    g.restore();
+    // ash lifts off the burnt edge
+    g.fillStyle = 'rgba(70,65,60,.7)';
+    flakes.forEach(([i, j, z]) => { const a = z - .05; if (a > .12) return; const p = toScreen((i + .5) * cw, (j + .5) * ch), k = a / .12;
+      g.globalAlpha = 1 - k; g.save(); g.translate(p[0] + Math.sin(i * 3 + k * 6) * .3 * U * k, p[1] - k * 2.2 * U); g.rotate(k * 6 + i); g.fillRect(-.03 * U, -.02 * U, .06 * U, .04 * U); g.restore(); });
+    g.globalAlpha = 1;
+  }
+
+  // ---------- the whole still life ----------
+  function renderScene(tt, now) {
+    const g = fx; g.setTransform(DPR, 0, 0, DPR, 0, 0); g.clearRect(0, 0, W, H);
+    const L = { head: [], back: [], front: [], falling: [] }, heads = [];
+    const st = PLANTS.map(pl => { const Lp = { head: [], back: L.back, front: L.front, falling: L.falling }; const r = plantLists(pl, tt, Lp); heads.push(Lp.head); return r; });
     const paint = list => list.sort((a, b) => a.z - b.z).forEach(it => drawItem(g, it));
-    paint(back);
-    drawStem(g, tt); drawVase(g, tt);
-    LEAF.forEach(lf => drawLeaf(g, lf, tt));
-    paint(head); paint(front); paint(falling);
+    paint(L.back);
+    drawCandle(g, tt, now);
+    PLANTS.forEach((pl, i) => drawStem(g, st[i].P, sm(.35, 1, Math.max(0, st[i].tau))));
+    PLANTS.forEach((pl, i) => drawVase(g, cx + pl.off * U, st[i].tau));
+    PLANTS.forEach((pl, i) => LEAF.forEach(lf => drawLeaf(g, pl, lf, st[i].P, st[i].tau)));
+    drawDandelion(g, tt);
+    heads.forEach(paint);
     drawWatch(g, tt);
+    drawLetter(g, tt);
+    paint(L.front);
+    drawCup(g, tt, now);
+    paint(L.falling);
+    drawFlyingSeeds(g, tt);
   }
 
-  // ---------- paper, light and seasons ----------
-  function makePaper() {
-    bg.width = fl.width; bg.height = fl.height; bx.setTransform(DPR, 0, 0, DPR, 0, 0);
-    const pg = bx.createRadialGradient(W / 2, H * .45, 0, W / 2, H * .45, Math.hypot(W, H) * .6);
-    pg.addColorStop(0, '#f5eedd'); pg.addColorStop(1, '#e3d4b4'); bx.fillStyle = pg; bx.fillRect(0, 0, W, H);
-    seed = 77;
-    for (let i = 0; i < 40; i++) { const x = rnd() * W, y = rnd() * H, r = 40 + rnd() * 220, q = bx.createRadialGradient(x, y, 0, x, y, r);
-      const c = rnd() < .5 ? '170,140,95' : '255,252,240'; q.addColorStop(0, `rgba(${c},.05)`); q.addColorStop(1, `rgba(${c},0)`); bx.fillStyle = q; bx.fillRect(x - r, y - r, r * 2, r * 2); }
-    bx.strokeStyle = 'rgba(120,95,60,.07)'; bx.lineWidth = .6;
-    for (let i = 0; i < 160; i++) { const x = rnd() * W, y = rnd() * H, a = rnd() * 7, l = 6 + rnd() * 18; bx.beginPath(); bx.moveTo(x, y); bx.quadraticCurveTo(x + Math.cos(a) * l * .5 + 3, y + Math.sin(a) * l * .5, x + Math.cos(a) * l, y + Math.sin(a) * l); bx.stroke(); }
-    // plate frame
-    const fr = frame; bx.strokeStyle = 'rgba(92,66,40,.55)'; bx.lineWidth = 1.2; bx.strokeRect(fr.l, fr.t, fr.r - fr.l, fr.b - fr.t);
-    bx.lineWidth = .6; bx.strokeRect(fr.l + 5, fr.t + 5, fr.r - fr.l - 10, fr.b - fr.t - 10);
-    // foxing that creeps in with age
-    fox.width = Math.ceil(W / 2); fox.height = Math.ceil(H / 2); ox.setTransform(.5, 0, 0, .5, 0, 0);
-    const eg = ox.createRadialGradient(W / 2, H / 2, Math.min(W, H) * .35, W / 2, H / 2, Math.hypot(W, H) * .62);
-    eg.addColorStop(0, 'rgba(255,255,255,0)'); eg.addColorStop(1, 'rgba(176,122,62,.6)'); ox.fillStyle = eg; ox.fillRect(0, 0, W, H);
-    for (let i = 0; i < 14; i++) { const ex = rnd() < .5, x = ex ? (rnd() < .5 ? rnd() * .18 : 1 - rnd() * .18) * W : rnd() * W, y = ex ? rnd() * H : (rnd() < .5 ? rnd() * .2 : 1 - rnd() * .2) * H;
-      const r = 2 + rnd() * 6, q = ox.createRadialGradient(x, y, 0, x, y, r); q.addColorStop(0, 'rgba(150,95,45,.3)'); q.addColorStop(1, 'rgba(150,95,45,0)'); ox.fillStyle = q; ox.fillRect(x - r, y - r, r * 2, r * 2); }
-    // grain tile
-    const gt = document.createElement('canvas'); gt.width = gt.height = 256; const gx = gt.getContext('2d'), id = gx.createImageData(256, 256);
-    for (let i = 0; i < 65536; i++) { const v = 243 + Math.random() * 12 - (Math.random() < .015 ? 26 : 0); id.data[i * 4] = v; id.data[i * 4 + 1] = v - 2; id.data[i * 4 + 2] = v - 7; id.data[i * 4 + 3] = 255; }
-    gx.putImageData(id, 0, 0); grainPat = ctx.createPattern(gt, 'repeat');
-  }
-  const TINT = [[0, [248, 251, 242]], [.45, [255, 247, 228]], [.75, [243, 213, 168]], [1, [224, 176, 136]]];
-  const tintAt = tt => { for (let i = 1; i < TINT.length; i++) if (tt <= TINT[i][0]) return mix(TINT[i - 1][1], TINT[i][1], (tt - TINT[i - 1][0]) / (TINT[i][0] - TINT[i - 1][0])); return TINT[3][1]; };
-
-  const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-  function labels(g, tt) {
-    const fr = frame, fs = Math.max(11, .24 * U), d = new Date(START + Math.round(tt * SPAN) * 864e5);
-    g.fillStyle = 'rgba(72,52,34,.82)'; g.textBaseline = 'alphabetic';
-    g.font = `${fs.toFixed(1)}px "IM Fell English SC", serif`; g.textAlign = 'left'; g.fillText('Pl. IX.', fr.l + 16, fr.t + 16 + fs);
-    g.textAlign = 'right'; g.fillText('The Curious Case', fr.r - 16, fr.t + 16 + fs);
-    const by = fr.b - 18;
-    g.font = `italic ${(fs * 1.15).toFixed(1)}px "IM Fell English", serif`; g.textAlign = 'left'; g.fillText('Tulipa gesneriana L.', fr.l + 16, by);
-    g.font = `${fs.toFixed(1)}px "IM Fell English SC", serif`; g.textAlign = 'right'; g.fillText(`${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}, 1918`, fr.r - 16, by);
-  }
-  let hintA = 1, wound = 0;
-  function hint(g) {
-    const want = (wound < 2.5 * U && !dragging) || (t > .985 && !dragging) ? 1 : 0;
-    hintA += (want - hintA) * .05; if (hintA < .01) return;
-    const fs = Math.max(12, .2 * U), y = crownY() - Rw * .85;
-    g.fillStyle = `rgba(72,52,34,${(.75 * hintA * (.75 + .25 * Math.sin(performance.now() / 500))).toFixed(3)})`;
-    g.font = `${fs.toFixed(1)}px "Gowun Batang", serif`; g.textAlign = 'center'; g.textBaseline = 'alphabetic';
-    g.fillText('용두를 돌려', wxc, y - fs * 1.35); g.fillText('시간을 되감아 보세요', wxc, y);
-  }
-
-  function render() {
-    renderScene(t);
+  function render(now) {
+    renderScene(t, now);
     ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
-    ctx.drawImage(bg, 0, 0);
-    ctx.setTransform(DPR, 0, 0, DPR, 0, 0); labels(ctx, t);
-    // cast shadow: morning light from the upper left, a long low shadow at dusk
+    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, cv.width, cv.height);
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    candleGlow(ctx, t);
+    // cast shadow: short to the right in the morning, long to the left at dusk
     sx.globalCompositeOperation = 'source-over'; sx.clearRect(0, 0, sh.width, sh.height); sx.drawImage(fl, 0, 0, sh.width, sh.height);
     sx.globalCompositeOperation = 'source-in'; sx.fillStyle = 'rgb(70,50,34)'; sx.fillRect(0, 0, sh.width, sh.height);
-    const k = lerp(.32, -.95, sm(0, 1, t)), oxf = lerp(.25, -.2, t) * U;
+    const k = lerp(.32, -.95, t), oxf = lerp(.25, -.2, t) * U;
     ctx.save(); ctx.setTransform(DPR, 0, -k * DPR, DPR, (k * Gy + oxf) * DPR, .05 * U * DPR); ctx.globalAlpha = lerp(.07, .16, t); ctx.drawImage(sh, 0, 0, W, H); ctx.restore();
     ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.drawImage(fl, 0, 0);
-    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-    // season and hour: spring morning → summer noon → autumn dusk
-    ctx.globalCompositeOperation = 'multiply'; ctx.fillStyle = rgb(tintAt(t)); ctx.fillRect(0, 0, W, H);
-    const vg = ctx.createRadialGradient(W / 2, H * .45, Math.min(W, H) * .3, W / 2, H * .45, Math.hypot(W, H) * .6);
-    vg.addColorStop(0, 'rgba(255,255,255,0)'); vg.addColorStop(1, `rgba(120,80,45,${(.12 + .38 * t).toFixed(3)})`); ctx.fillStyle = vg; ctx.fillRect(0, 0, W, H);
-    ctx.globalAlpha = sm(.15, 1, t) * .85; ctx.drawImage(fox, 0, 0, W, H); ctx.globalAlpha = 1;
-    // window light wandering across the wall
-    const s = lp.width / W; lx.setTransform(1, 0, 0, 1, 0, 0); lx.clearRect(0, 0, lp.width, lp.height);
-    const lxp = lerp(cx - 3.3 * U, cx + 2.9 * U, t), lyp = lerp(Gy - 6.6 * U, Gy - 2.5 * U, t) - Math.sin(Math.PI * t) * .8 * U;
-    const lw2 = lerp(3.2, 4.9, t) * U, lh = lerp(2.6, 1.8, t) * U, sk = lerp(.25, -.6, t);
-    lx.filter = 'blur(2px)'; lx.setTransform(s, 0, sk * s, s, lxp * s, lyp * s);
-    lx.fillStyle = rgb(mix([255, 251, 236], [255, 166, 88], sm(.45, 1, t)));
-    const gp = .08 * U; [[0, 0], [1, 0], [0, 1], [1, 1]].forEach(([a, b]) => lx.fillRect(-lw2 / 2 + a * lw2 / 2 + gp / 2, -lh / 2 + b * lh / 2 + gp / 2, lw2 / 2 - gp, lh / 2 - gp));
-    lx.filter = 'none';
-    ctx.globalCompositeOperation = 'screen'; ctx.globalAlpha = lerp(.16, .4, t); ctx.drawImage(lp, 0, 0, W, H); ctx.globalAlpha = 1;
-    ctx.globalCompositeOperation = 'source-over'; hint(ctx);
-    ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalCompositeOperation = 'multiply'; ctx.fillStyle = grainPat; ctx.fillRect(0, 0, cv.width, cv.height);
-    ctx.globalCompositeOperation = 'source-over';
   }
 
   function resize() {
     W = innerWidth; H = innerHeight; DPR = Math.min(2, devicePixelRatio || 1);
     for (const c of [cv, fl]) { c.width = Math.round(W * DPR); c.height = Math.round(H * DPR); }
-    sh.width = Math.ceil(W / 5); sh.height = Math.ceil(H / 5); lp.width = Math.ceil(W / 8); lp.height = Math.ceil(H / 8);
-    U = Math.min(H / 11.2, W / 9.2); cx = W / 2 + .3 * U; Gy = Math.min(H - 1.5 * U, H / 2 + 4.6 * U);
-    Rw = .95 * U; wxc = cx - 3.1 * U; wyc = Gy - Rw - .02 * U;
-    const l = Math.max(14, W / 2 - 4.6 * U); frame = { l, r: W - l, t: Math.max(14, Gy - 9.4 * U), b: Math.min(H - 14, Gy + 1.15 * U) };
-    makePaper();
+    sh.width = Math.ceil(W / 5); sh.height = Math.ceil(H / 5);
+    U = Math.min(H / 11.2, W / 14.4); cx = W / 2 + .1 * U; Gy = Math.min(H - 1.7 * U, H / 2 + 4.6 * U);
+    Rw = .95 * U; wxc = cx - 4.3 * U; wyc = Gy - Rw - .02 * U;
+    makeCup(); makeLetter();
   }
 
-  // ---------- sound: a quiet tick, a ratchet while winding ----------
-  let AC, noise;
+  // ---------- sound: everything has a forward voice and a reversed one ----------
+  let AC, BUF = {};
+  function mkBuf(len, fn) { const b = AC.createBuffer(1, Math.round(AC.sampleRate * len), AC.sampleRate), d = b.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = fn(i / AC.sampleRate, i / d.length); return b; }
+  function reversed(b) { const r = AC.createBuffer(1, b.length, b.sampleRate), s = b.getChannelData(0), d = r.getChannelData(0); for (let i = 0; i < s.length; i++) d[i] = s[s.length - 1 - i]; return r; }
   function ensureAudio() {
     try {
-      if (!AC) { AC = new (window.AudioContext || window.webkitAudioContext)(); noise = AC.createBuffer(1, AC.sampleRate * .05, AC.sampleRate); const d = noise.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / d.length, 6); }
+      if (!AC) {
+        AC = new (window.AudioContext || window.webkitAudioContext)();
+        const N = () => Math.random() * 2 - 1;
+        BUF.tick = mkBuf(.05, (s, p) => N() * Math.pow(1 - p, 6));
+        // porcelain: a bright crack and ringing pieces
+        BUF.crash = mkBuf(.9, (s, p) => { let v = N() * Math.exp(-s * 18) * .9; [2400, 3700, 5100, 6600].forEach((f, i) => { v += Math.sin(2 * Math.PI * f * s * (1 + i * .01)) * Math.exp(-s * (5 + i * 3)) * .22 * (s > i * .05 ? 1 : 0); }); return v * .8; });
+        BUF.strike = mkBuf(.45, (s, p) => N() * sm(0, .04, s) * Math.exp(-s * 6) * .6 + Math.sin(2 * Math.PI * 120 * s) * Math.exp(-s * 8) * .2);
+        BUF.puff = mkBuf(.35, (s, p) => N() * Math.sin(Math.PI * p) * .35);
+        BUF.crackle = mkBuf(1.6, (s, p) => (Math.random() < .004 ? N() * 3 : N() * .05) * Math.sin(Math.PI * p));
+        BUF.tok = mkBuf(.14, (s, p) => Math.sin(2 * Math.PI * (300 + 700 * Math.exp(-s * 40)) * s) * Math.exp(-s * 30) * .6);
+        Object.keys(BUF).forEach(k => { BUF[k + 'R'] = reversed(BUF[k]); });
+      }
       if (AC.state === 'suspended') AC.resume();
     } catch (e) { AC = null; }
   }
-  function click(freq, vol) {
-    if (!AC || AC.state !== 'running') return;
-    const s = AC.createBufferSource(), f = AC.createBiquadFilter(), g = AC.createGain();
-    s.buffer = noise; f.type = 'bandpass'; f.frequency.value = freq; f.Q.value = 4; g.gain.value = vol;
-    s.connect(f).connect(g).connect(AC.destination); s.start();
+  function play(name, vol, freq) {
+    if (!AC || AC.state !== 'running' || !BUF[name]) return;
+    const s = AC.createBufferSource(), g = AC.createGain(); s.buffer = BUF[name]; g.gain.value = vol;
+    if (freq) { const f = AC.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = freq; f.Q.value = 4; s.connect(f).connect(g); } else s.connect(g);
+    g.connect(AC.destination); s.start();
+  }
+  // events on the timeline: forward plays the sound, rewinding plays it backwards
+  const EVENTS = [
+    { at: T_LIGHT, snd: 'strike', vol: .5 }, { at: T_OUT, snd: 'puff', vol: .5 },
+    { at: T_BREAK, snd: 'crash', vol: .7 }, { at: T_BURN + .01, snd: 'crackle', vol: .6 },
+  ];
+  PLANTS[0].pet.forEach(p => EVENTS.push({ at: p.td + FD, snd: 'tok', vol: .35 }));
+  // Benjamin's petals leave the table as time runs forward, so his landings sound backwards
+  PLANTS[1].pet.forEach(p => EVENTS.push({ at: (1 - (p.td + FD)) * MEET / (1 - MEET), snd: 'tok', vol: .35, flip: true }));
+  function events(a, b) {
+    if (a === b) return;
+    EVENTS.forEach(e => {
+      if (a < e.at && b >= e.at) play(e.snd + (e.flip ? 'R' : ''), e.vol);
+      else if (b < e.at && a >= e.at) play(e.snd + (e.flip ? '' : 'R'), e.vol);
+    });
   }
 
   // ---------- winding the crown ----------
-  let dragging = false, lastX = 0, lastY = 0, clickAcc = 0;
+  let dragging = false, lastX = 0, lastY = 0, clickAcc = 0, wound = 0, tickAcc = 0;
   const onCrown = (x, y) => Math.abs(x - wxc) < Math.max(.6 * Rw, 36) && Math.abs(y - crownY()) < Math.max(.45 * Rw, 30);
+  function setT(v) { const a = t; t = clamp(v, 0, 1); events(a, t); }
   function wind(amt, dir) {
     if (amt <= 0) return;
     crownPh += dir * amt * .06; clickAcc += amt; wound += amt;
-    while (clickAcc > 7) { clickAcc -= 7; click(t > 0 ? 3400 : 1800, .12); }
+    while (clickAcc > 9) { clickAcc -= 9; play('tick', .05, t > 0 ? 3000 : 1600); }
     if (t <= 0) return;
-    t = Math.max(0, t - amt / (U * 15)); secA -= amt * .05;
+    const dt = amt / (U * 15); setT(t - dt); secA -= amt * .05;
+    // the watch's own tick, played backwards, once per rewound second
+    tickAcc += dt; while (tickAcc > RATE) { tickAcc -= RATE; play('tickR', .09, 5200); }
   }
   cv.addEventListener('pointerdown', e => {
     ensureAudio();
@@ -433,14 +592,13 @@
   (function loop(now) {
     const dt = Math.min(.1, (now - last) / 1000); last = now;
     if (!dragging && !hold && t < 1) {
-      t = Math.min(1, t + dt * RATE); secAcc += dt;
-      if (secAcc >= 1) { secAcc -= 1; secA += 6 * RAD; click(5200, .025); }
+      setT(t + dt * RATE); secAcc += dt;
+      if (secAcc >= 1) { secAcc -= 1; secA += 6 * RAD; play('tick', .03, 5200); }
     }
-    render(); requestAnimationFrame(loop);
+    render(now); requestAnimationFrame(loop);
   })(last);
-  if (document.fonts) document.fonts.ready.then(() => render());
 
-  // for checking by hand: __bb.set(.7), __bb.hold = true
+  // for checking by hand: __bb.set(.7), __bb.hold = true, or open with #t=0.5
   window.__bb = { set: v => { t = clamp(v, 0, 1); }, get: () => t, set hold(v) { hold = v; } };
   const ht = /[#&]t=([\d.]+)/.exec(location.hash); if (ht) { t = clamp(+ht[1], 0, 1); hold = true; }
 })();
