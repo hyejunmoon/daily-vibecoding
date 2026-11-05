@@ -171,6 +171,13 @@
       url: './day08/',
       thumb: 'paris',
     },
+    '2026-11-05': {
+      title: 'The Curious Case',
+      credit: '벤자민 버튼의 시간은 거꾸로 간다 · The Curious Case of Benjamin Button',
+      note: '천천히 시들어가는 튤립, 회중시계 용두를 돌리면 꽃과 계절이 거꾸로 흘러요',
+      url: './day09/',
+      thumb: 'curious',
+    },
   };
 
   /* ---------- little pictures for the slide windows ---------- */
@@ -239,6 +246,22 @@
       const front = G.map(([c, path]) => `<path d="${path}" style="fill:var(--${c})" stroke="#000" stroke-width="0.5"/>`).join('');
       return `<svg viewBox="46 96 200 133" role="img" aria-label="흰 카드 위 overlap, 뒤로 여러 색 복사본이 위아래로 겹쳐 있음">
         <rect x="0" y="0" width="300" height="300" style="fill:var(--thumb-card)"/>${back}${front}
+      </svg>`;
+    },
+    curious() {
+      // a drooping tulip in a bud vase beside a pocket watch, on old paper
+      return `<svg viewBox="0 0 150 100" role="img" aria-label="낡은 종이 위 유리병에 꽂힌 튤립과 회중시계">
+        <rect width="150" height="100" fill="#ece1c6"/>
+        <rect x="6" y="5" width="138" height="90" fill="none" stroke="#7a5a3a" stroke-width=".8"/>
+        <path d="M84 84 C84 60 84 44 86 30" fill="none" stroke="#5f8c4a" stroke-width="2.6" stroke-linecap="round"/>
+        <path d="M85 56 Q70 44 66 34 Q78 40 85 52 Z" fill="#6f9c55" stroke="#3a5a30" stroke-width=".6"/>
+        <path d="M85 64 Q100 52 104 42 Q94 50 85 60 Z" fill="#5d8a49" stroke="#3a5a30" stroke-width=".6"/>
+        <path d="M78 28 Q78 14 82 12 L85 18 L88 11 L92 18 L95 13 Q97 22 94 28 Q86 34 78 28 Z" fill="#c8324a" stroke="#7a1c2c" stroke-width=".7"/>
+        <path d="M78 66 Q76 76 78 86 L92 86 Q94 76 91 66 Q88 62 88 58 L81 58 Q81 62 78 66 Z" fill="#dfe8e4" fill-opacity=".55" stroke="#5a6a68" stroke-width=".7"/>
+        <path d="M104 86 q4 -3 9 -1" stroke="#8a4a3c" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+        <circle cx="50" cy="74" r="11" fill="#c9a051" stroke="#5f451a" stroke-width=".8"/><circle cx="50" cy="74" r="8.6" fill="#f8f1de"/>
+        <rect x="47.6" y="60" width="4.8" height="3" rx="1" fill="#c9a051" stroke="#5f451a" stroke-width=".5"/>
+        <path d="M50 74 L50 67.5 M50 74 L54 76" stroke="#263150" stroke-width="1" stroke-linecap="round"/>
       </svg>`;
     },
     paris() {
