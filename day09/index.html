@@ -7,10 +7,18 @@
   canvas { display: block; position: fixed; inset: 0; width: 100%; height: 100%; touch-action: none; }
   body.grab canvas { cursor: grab; }
   body.grabbing canvas { cursor: grabbing; }
+  .timer { position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%);
+    display: flex; gap: 4px; padding: 4px; border-radius: 999px; background: rgba(255,255,255,.85); }
+  .timer button { border: 0; background: transparent; color: #b3ada3; font: 500 13px/1 system-ui, sans-serif; font-variant-numeric: tabular-nums;
+    min-width: 36px; padding: 8px 10px; border-radius: 999px; cursor: pointer; transition: background .2s, color .2s; }
+  .timer button:hover { color: #6b655c; }
+  .timer button[aria-pressed="true"] { color: #3b362f; background: #f1eee8; }
+  .timer button:focus-visible { outline: 2px solid #c9a051; outline-offset: 1px; }
 </style>
 
 
 <canvas id="c" aria-label="나란히 놓인 두 튤립. 하나는 시들고 하나는 거꾸로 젊어집니다. 화면을 드래그하면 시간이 거꾸로 흐릅니다."></canvas>
+<div class="timer" id="timer" role="group" aria-label="꽃이 다 지는 시간(분)"></div>
 <script>
 (() => {
   // ---------- helpers ----------
@@ -41,7 +49,10 @@
   // t = 0 spring morning, t = 1 autumn dusk. Everything on screen is a pure function of t,
   // so winding the crown backwards replays every moment in reverse.
   let t = 0, hold = false;
-  const RATE = 1 / 40;
+  const TICK = 1 / 40;          // one rewound watch-tick
+  const TIMERS = [1, 5, 15, 25, 60]; // minutes for the flower to fall completely
+  let minutes = 1; try { const m = +localStorage.getItem('cc-minutes'); if (TIMERS.includes(m)) minutes = m; } catch (e) {}
+  let rate = 1 / (minutes * 60), rang = false;
   const MEET = .35; // the one moment both tulips are the same age
 
   // ---------- tulips ----------
@@ -553,7 +564,7 @@
   // ---------- winding the crown ----------
   let dragging = false, lastX = 0, lastY = 0, clickAcc = 0, wound = 0, tickAcc = 0;
   const onCrown = () => true; // the whole page is the crown now
-  function setT(v) { const a = t; t = clamp(v, 0, 1); events(a, t); }
+  function setT(v) { const a = t; t = clamp(v, 0, 1); events(a, t); if (t >= 1 && a < 1 && !rang) { rang = true; chime(); } if (t < .999) rang = false; }
   function wind(amt, dir) {
     if (amt <= 0) return;
     crownPh += dir * amt * .06; clickAcc += amt; wound += amt;
@@ -561,7 +572,7 @@
     if (t <= 0) return;
     const dt = amt / (U * 15); setT(t - dt); secA -= amt * .05;
     // the watch's own tick, played backwards, once per rewound second
-    tickAcc += dt; while (tickAcc > RATE) { tickAcc -= RATE; play('tickR', .09, 5200); }
+    tickAcc += dt; while (tickAcc > TICK) { tickAcc -= TICK; play('tickR', .09, 5200); }
   }
   cv.addEventListener('pointerdown', e => {
     ensureAudio();
@@ -577,13 +588,30 @@
   cv.addEventListener('pointerup', end); cv.addEventListener('pointercancel', end);
   cv.addEventListener('wheel', e => { e.preventDefault(); const d = e.deltaY + e.deltaX; wind(Math.min(60, Math.abs(d) * .5), Math.sign(d) || 1); }, { passive: false });
 
+  // ---------- timer: pick how long the flower takes to fall; a small bell when it has ----------
+  function chime() {
+    if (!AC || AC.state !== 'running') return;
+    [[1568, 0], [1976, .22], [2349, .44], [1568, 1.1], [1976, 1.32], [2349, 1.54]].forEach(([f, d]) => {
+      const now = AC.currentTime + d, g = AC.createGain(); g.gain.setValueAtTime(0, now); g.gain.linearRampToValueAtTime(.16, now + .01); g.gain.exponentialRampToValueAtTime(.0001, now + 1.6); g.connect(AC.destination);
+      [1, 2.76, 5.4].forEach((h, i) => { const o = AC.createOscillator(), og = AC.createGain(); o.type = 'sine'; o.frequency.value = f * h; og.gain.value = [1, .35, .12][i]; o.connect(og).connect(g); o.start(now); o.stop(now + 1.7); });
+    });
+  }
+  const timerEl = document.getElementById('timer');
+  function drawTimer() { timerEl.innerHTML = TIMERS.map(m => `<button type="button" data-m="${m}" aria-label="${m}분" aria-pressed="${m === minutes}">${m}</button>`).join(''); }
+  timerEl.addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    ensureAudio(); minutes = +b.dataset.m; rate = 1 / (minutes * 60); try { localStorage.setItem('cc-minutes', String(minutes)); } catch (er) {}
+    t = 0; rang = false; drawTimer();
+  });
+  drawTimer();
+
   // ---------- run ----------
   resize(); addEventListener('resize', resize);
   let last = performance.now(), secAcc = 0;
   (function loop(now) {
     const dt = Math.min(.1, (now - last) / 1000); last = now;
     if (!dragging && !hold && t < 1) {
-      setT(t + dt * RATE); secAcc += dt;
+      setT(t + dt * rate); secAcc += dt;
       if (secAcc >= 1) { secAcc -= 1; secA += 6 * RAD; play('tick', .03, 5200); }
     }
     render(now); requestAnimationFrame(loop);
