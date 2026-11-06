@@ -178,6 +178,13 @@
       url: './day09/',
       thumb: 'curious',
     },
+    '2026-11-06': {
+      title: 'Everything Everywhere All at Once',
+      credit: '에브리씽 에브리웨어 올 앳 원스 · Everything Everywhere All at Once',
+      note: '미간엔 눈알, 머리엔 돌멩이, 열 손가락은 소세지·꽃·촛불로 바뀌는 카메라 필터. 손을 숨겼다 보이면 바뀌고, 촛불은 후~ 불어 꺼요',
+      url: './day10/',
+      thumb: 'eeaao',
+    },
   };
 
   /* ---------- little pictures for the slide windows ---------- */
@@ -262,6 +269,19 @@
         <circle cx="50" cy="74" r="11" fill="#c9a051" stroke="#5f451a" stroke-width=".8"/><circle cx="50" cy="74" r="8.6" fill="#f8f1de"/>
         <rect x="47.6" y="60" width="4.8" height="3" rx="1" fill="#c9a051" stroke="#5f451a" stroke-width=".5"/>
         <path d="M50 74 L50 67.5 M50 74 L54 76" stroke="#263150" stroke-width="1" stroke-linecap="round"/>
+      </svg>`;
+    },
+    eeaao() {
+      // a googly-eyed rock on a head, a tiny eye between the brows, sausage fingers
+      const eye = (x, y, r, dx = 0, dy = 1) => `<circle cx="${x}" cy="${y}" r="${r}" fill="#f6f6f8" stroke="#a9a9b2" stroke-width=".5"/><circle cx="${x + dx * r * .3}" cy="${y + dy * r * .3}" r="${r * .58}" fill="#111"/><circle cx="${x - r * .35}" cy="${y - r * .4}" r="${r * .14}" fill="#fff" opacity=".9"/>`;
+      const saus = (x1, y1, x2, y2) => `<path d="M${x1} ${y1} L${x2} ${y2}" stroke="#c4877a" stroke-width="7" stroke-linecap="round"/><path d="M${x1 - .8} ${y1} L${x2 - .8} ${y2}" stroke="#eab9ac" stroke-width="4" stroke-linecap="round"/>`;
+      const hand = (x, f) => [[-9, -24], [-3, -30], [3, -31], [9, -27]].map(([dx, dy]) => saus(x + dx * f * .6, 84, x + dx * f, 84 + dy)).join('') + saus(x - 12 * f, 92, x - 22 * f, 78);
+      return `<svg viewBox="0 0 150 100" role="img" aria-label="머리 위 눈알 달린 돌멩이, 미간의 눈알 스티커, 소세지가 된 손가락">
+        <rect width="150" height="100" fill="#8b9296"/>
+        <ellipse cx="75" cy="58" rx="20" ry="27" fill="#d9b49a"/>
+        <path d="M54 28 Q54 10 75 9 Q97 10 96 28 Q75 32 54 28 Z" fill="#3e4040"/>
+        ${eye(68, 20, 4.2, -.4)}${eye(82, 20, 4.2, -.4)}${eye(75, 46, 2.2)}
+        ${hand(32, 1)}${hand(118, -1)}
       </svg>`;
     },
     paris() {
