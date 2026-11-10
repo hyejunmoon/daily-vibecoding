@@ -111,7 +111,7 @@
   const WEEKS = [
     { n: 1, monday: [2026, 10, 26], theme: '좋아하는 노래의 가사나 제목으로' },
     { n: 2, monday: [2026, 11, 2], theme: '좋아하는 영화에서 영감받아' },
-    { n: 3, monday: [2026, 11, 9], theme: null },
+    { n: 3, monday: [2026, 11, 9], theme: '사회 이슈에서 출발해' },
     { n: 4, monday: [2026, 11, 16], theme: null },
   ];
   const WORKS = {
@@ -184,6 +184,13 @@
       note: '미간엔 눈알, 머리엔 돌멩이, 열 손가락은 소세지·꽃·촛불로 바뀌는 카메라 필터. 손을 숨겼다 보이면 바뀌고, 촛불은 후~ 불어 꺼요',
       url: './day10/',
       thumb: 'eeaao',
+    },
+    '2026-11-09': {
+      title: 'Chicken Price Mystery',
+      credit: '닭 원육값은 폭락했는데 치킨값은 그대로',
+      note: '빈티지 광고 표지의 두 동그라미로 들어가요. 왼쪽은 비싼 닭·싼 닭 해부도의 숫자에 마우스를 올리면 사정이 나오고, 오른쪽은 창 폭을 바꾸면 2020년부터 치킨값과 그 안의 닭값이 움직여요',
+      url: './day11/',
+      thumb: 'chicken',
     },
   };
 
@@ -282,6 +289,22 @@
         <path d="M54 28 Q54 10 75 9 Q97 10 96 28 Q75 32 54 28 Z" fill="#3e4040"/>
         ${eye(68, 20, 4.2, -.4)}${eye(82, 20, 4.2, -.4)}${eye(75, 46, 2.2)}
         ${hand(32, 1)}${hand(118, -1)}
+      </svg>`;
+    },
+    chicken() {
+      // the vintage chicken-price ad: a black panel with two white circles
+      return `<svg viewBox="0 0 150 100" role="img" aria-label="빈티지 광고: 원육값 −37.7%와 치킨 ₩23,000 두 동그라미">
+        <rect width="150" height="100" fill="#efeacf"/>
+        <path d="M20 34 Q20 28 26 28 L124 28 Q130 28 130 34 L130 90 L20 90 Z" fill="#171411"/>
+        <path d="M52 27 q2 -9 9 -8 q3 -6 7 -1 q4 -3 5 2 q5 1 3 7 Z M80 27 q1 -8 8 -7 q4 -5 7 0 q5 0 3 7 Z" fill="#171411"/>
+        <circle cx="38" cy="60" r="19" fill="#efeacf" stroke="#171411" stroke-width="1.5"/>
+        <circle cx="112" cy="60" r="19" fill="#efeacf" stroke="#171411" stroke-width="1.5"/>
+        <text x="38" y="63" text-anchor="middle" font-family="Georgia,serif" font-weight="700" font-size="8.5" fill="#171411">-37.7%</text>
+        <text x="112" y="63" text-anchor="middle" font-family="Georgia,serif" font-weight="700" font-size="7" fill="#171411">₩23,000</text>
+        <text x="75" y="48" text-anchor="middle" font-family="Georgia,serif" font-size="4.6" fill="#efeacf">THE GREAT</text>
+        <text x="75" y="58" text-anchor="middle" font-family="Georgia,serif" font-size="5.6" fill="#efeacf">CHICKEN</text>
+        <text x="75" y="68" text-anchor="middle" font-family="Georgia,serif" font-size="5.6" fill="#efeacf">PRICE</text>
+        <text x="75" y="78" text-anchor="middle" font-family="Georgia,serif" font-size="4.6" fill="#efeacf">MYSTERY</text>
       </svg>`;
     },
     paris() {
